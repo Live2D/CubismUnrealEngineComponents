@@ -1,0 +1,34 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "5-r.1-alpha.1",
+	"FriendlyName": "Live2DCubismSDK",
+	"Description": "Live2D Cubism SDK for Unreal Engine Components",
+	"Category": "Other",
+	"CreatedBy": "Live2D Inc,",
+	"CreatedByURL": "https://www.live2d.com/",
+	"DocsURL": "https://docs.live2d.com/cubism-sdk-manual/top/",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "Live2DCubismFramework",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit"
+		},
+		{
+			"Name": "Live2DCubismFrameworkEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "Live2DCubismFrameworkImporter",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	]
+}

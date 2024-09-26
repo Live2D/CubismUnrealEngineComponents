@@ -12,20 +12,8 @@
 #include "Model/CubismModelActor.h"
 #include "Model/CubismModelComponent.h"
 #include "Model/CubismParameterComponent.h"
-#include "Kismet/GameplayStatics.h"
-
-const float FrameRate = 30.0f;
-const float Epsilon = 0.01f;
 
 UCubismLookAtComponent::UCubismLookAtComponent()
-	: FaceTargetX(0.0f)
-	, FaceTargetY(0.0f)
-	, FaceX(0.0f)
-	, FaceY(0.0f)
-	, FaceVX(0.0f)
-	, FaceVY(0.0f)
-	, LastTimeSeconds(0.0f)
-	, UserTimeSeconds(0.0f)
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
@@ -93,50 +81,50 @@ void UCubismLookAtComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 
 		switch (Parameter.Axis)
 		{
-			case ECubismLookAtAxis::X:
-			{
-				Parameter.Value = Parameter.Factor * LastPosition.X;
-				break;
-			}
-			case ECubismLookAtAxis::Y:
-			{
-				Parameter.Value = Parameter.Factor * LastPosition.Y;
-				break;
-			}
-			case ECubismLookAtAxis::Z:
-			{
-				Parameter.Value = Parameter.Factor * LastPosition.Z;
-				break;
-			}
-			default:
-			{
-				ensure(false);
-				break;
-			}
+		case ECubismLookAtAxis::X:
+		{
+			Parameter.Value = Parameter.Factor * LastPosition.X;
+			break;
+		}
+		case ECubismLookAtAxis::Y:
+		{
+			Parameter.Value = Parameter.Factor * LastPosition.Y;
+			break;
+		}
+		case ECubismLookAtAxis::Z:
+		{
+			Parameter.Value = Parameter.Factor * LastPosition.Z;
+			break;
+		}
+		default:
+		{
+			ensure(false);
+			break;
+		}
 		}
 
-		switch(Parameter.BlendMode)
+		switch (Parameter.BlendMode)
 		{
-			case ECubismParameterBlendMode::Overwrite:
-			{
-				Destination->SetParameterValue(Parameter.Value);
-				break;
-			}
-			case ECubismParameterBlendMode::Additive:
-			{
-				Destination->AddParameterValue(Parameter.Value);
-				break;
-			}
-			case ECubismParameterBlendMode::Multiplicative:
-			{
-				Destination->MultiplyParameterValue(Parameter.Value);
-				break;
-			}
-			default:
-			{
-				ensure(false);
-				break;
-			}
+		case ECubismParameterBlendMode::Overwrite:
+		{
+			Destination->SetParameterValue(Parameter.Value);
+			break;
+		}
+		case ECubismParameterBlendMode::Additive:
+		{
+			Destination->AddParameterValue(Parameter.Value);
+			break;
+		}
+		case ECubismParameterBlendMode::Multiplicative:
+		{
+			Destination->MultiplyParameterValue(Parameter.Value);
+			break;
+		}
+		default:
+		{
+			ensure(false);
+			break;
+		}
 		}
 	}
 }
@@ -146,90 +134,27 @@ FVector UCubismLookAtComponent::SmoothDamp(const FVector CurrentValue, const flo
 {
 	// global(world) coordinates to local(object) coordinates
 	const FTransform Transform = Model->GetRelativeTransform();
+	FVector TargetValue = Transform.InverseTransformPosition(Target ? Target->GetActorLocation() : Transform.GetLocation());
 
-	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
-	if (!PlayerController)
+	const float Scale = 100.0f / Model->GetPixelsPerUnit();
+	TargetValue = FVector(-TargetValue.Y, TargetValue.Z, TargetValue.X) * Scale;
+
+	const float Omega = 2.0f / Smoothing;
+	const float x = Omega * DeltaTime;
+	const float Invexp = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
+
+	const FVector Damp = CurrentValue - TargetValue;
+
+	const FVector Tmp = (CurrentVelocity + Omega * Damp) * DeltaTime;
+	CurrentVelocity = (CurrentVelocity - Omega * Tmp) * Invexp;
+
+	FVector NewDamp = (Damp + Tmp) * Invexp;
+
+	if (FVector::DotProduct(Damp, NewDamp) < 0.0f)
 	{
-		return CurrentValue;
+		NewDamp = FVector::ZeroVector;
+		CurrentVelocity = FVector::ZeroVector;
 	}
 
-	FVector2D ScreenPosition;
-	PlayerController->ProjectWorldLocationToScreen((Target->GetActorLocation() - Transform.GetLocation()), ScreenPosition, false);
-
-	FVector2D Resolution = GEngine->GameViewport->Viewport->GetSizeXY();
-
-	FaceTargetX = (float)(ScreenPosition.X / Resolution.X) * 2.0f - 1.0f;
-	FaceTargetY = (float)(ScreenPosition.Y / Resolution.Y) * 2.0f - 1.0f;
-
-	UserTimeSeconds += DeltaTime;
-
-	const float FaceParamMaxV = 40.0f / 10.0f;
-	const float MaxV = FaceParamMaxV * 1.0f / FrameRate;
-
-
-	if (LastTimeSeconds == 0.0f)
-	{
-		LastTimeSeconds = UserTimeSeconds;
-		return CurrentValue;
-	}
-
-
-	const float DeltaTimeWeight = (UserTimeSeconds - LastTimeSeconds) * FrameRate;
-	LastTimeSeconds = UserTimeSeconds;
-
-	const float TimeToMaxSpeed = 0.15f;
-	const float FrameToMaxSpeed = TimeToMaxSpeed * FrameRate;     // sec * frame/sec
-	const float MaxA = DeltaTimeWeight * MaxV / FrameToMaxSpeed;
-
-
-	const float DX = FaceTargetX - FaceX;
-	const float DY = FaceTargetY - FaceY;
-
-
-	if (FMath::Abs(DX) <= Epsilon && FMath::Abs(DY) <= Epsilon)
-	{
-		return CurrentValue;
-	}
-
-	const float D = FMath::Sqrt((DX * DX) + (DY * DY));
-
-
-	const float VX = MaxV * DX / D;
-	const float VY = MaxV * DY / D;
-
-
-	float AX = VX - FaceVX;
-	float AY = VY - FaceVY;
-
-	const float A = FMath::Sqrt((AX * AX) + (AY * AY));
-
-
-	if (A < -MaxA || A > MaxA)
-	{
-		AX *= MaxA / A;
-		AY *= MaxA / A;
-	}
-
-	FaceVX += AX;
-	FaceVY += AY;
-
-	{
-
-		const float MaxVelocity = 0.5f * (FMath::Sqrt((MaxA * MaxA) + 16.0f * MaxA * D - 8.0f * MaxA * D) - MaxA);
-		const float CurVelocity = FMath::Sqrt((FaceVX * FaceVX) + (FaceVY * FaceVY));
-
-		if (CurVelocity > MaxVelocity)
-		{
-			FaceVX *= MaxVelocity / CurVelocity;
-			FaceVY *= MaxVelocity / CurVelocity;
-		}
-	}
-
-	FaceX += FaceVX;
-	FaceY += FaceVY;
-
-	FVector Ret = FVector(-FaceX, -FaceY, 0);
-
-
-	return Ret;
+	return NewDamp + TargetValue;
 }

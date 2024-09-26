@@ -1,2 +1,17 @@
+# Core directory files
+/Source/ThirdParty/Live2DCubismCore/**/*.a
+/Source/ThirdParty/Live2DCubismCore/**/*.bundle
+/Source/ThirdParty/Live2DCubismCore/**/*.dll
+/Source/ThirdParty/Live2DCubismCore/**/*.dylib
+/Source/ThirdParty/Live2DCubismCore/**/*.lib
+/Source/ThirdParty/Live2DCubismCore/**/*.so
+
+# Other files
+/build/
+.vs/
+.vscode/
+.idea/
+*.iml
+.DS_Store
 Binaries
 Intermediate

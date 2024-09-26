@@ -41,7 +41,7 @@ public:
 	/**
 	 * The index of the motion to play.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism", meta = (ClampMin = "-1", SliderMin = "-1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	int32 Index = -1;
 
 	/**
@@ -141,7 +141,7 @@ private:
 	 * @brief The function to update the motion.
 	 * @param Motion The motion to update.
 	 */
-	void UpdateMotion(const TSharedPtr<FCubismMotion>& Motion);
+	void UpdateMotion(float UserTimeSeconds, float FadeWeight, const TSharedPtr<FCubismMotion>& CubismMotion);
 
 public:
 	// UObject interface

@@ -55,7 +55,7 @@ enum class ECubismPhysicsSource : uint8
  * An enumeration to specify the target of physics parameter.
  */
 UENUM(BlueprintType)
-enum class ECubismPhysicsTargetType
+enum class ECubismPhysicsTargetType : uint8
 {
 	Parameter,
 };

@@ -9,6 +9,11 @@
 #include "Motion/CubismMotion.h"
 
 FCubismMotion::FCubismMotion(const UCubismMotion3Json* Json, const float InOffsetTime)
+	: Weight(1.0f)
+	, FadeOutSeconds(0.0f)
+	, EndTimeSeconds(-1.0f)
+	, bIsTriggeredFadeOut(false)
+	, bFinished(false)
 {
 	Duration = Json->Duration;
 	bLoop = Json->bLoop;
@@ -30,64 +35,84 @@ void FCubismMotion::Init(const float Time)
 	EndTime = Duration;
 }
 
-float FCubismMotion::CalcWeight(const FString Id, const float ElapsedTime) const
+float FCubismMotion::UpdateFadeWeight(const TSharedPtr<FCubismMotion>& CubismMotion, float UserTimeSeconds)
 {
-	float FadeInWeight = 1.0f;
-	float FadeOutWeight = 1.0f;
+	float FadeWeight = Weight;
 
-	if (FadeInTime > 0.0f)
-	{
-		FadeInWeight = EasingSin((ElapsedTime - OffsetTime) / FadeInTime);
-	}
+	const float FadeIn = CubismMotion->FadeInTime == 0.0f
+		? 1.0f
+		: EasingSin((UserTimeSeconds - CubismMotion->StartTime) / CubismMotion->FadeInTime);
 
-	if (State != ECubismMotionState::PlayInLoop && FadeOutTime > 0.0f)
-	{
-		FadeOutWeight = EasingSin((EndTime - ElapsedTime) / FadeOutTime);
-	}
+	const float FadeOut = (CubismMotion->FadeOutTime == 0.0f || CubismMotion->GetEndTime() < 0.0f)
+		? 1.0f
+		: EasingSin((CubismMotion->GetEndTime() - UserTimeSeconds) / CubismMotion->FadeOutTime);
 
-	for (const FCubismMotionCurve& Curve : Curves)
-	{
-		if (Curve.Id != Id)
-		{
-			continue;
-		}
-
-		if (Curve.FadeInTime == 0.0f)
-		{
-			FadeInWeight = 1.0f;
-		}
-		else if (Curve.FadeInTime > 0.0f)
-		{
-			FadeInWeight = EasingSin((ElapsedTime - OffsetTime) / Curve.FadeInTime);
-		}
-
-		if (Curve.FadeOutTime == 0.0f || State == ECubismMotionState::PlayInLoop)
-		{
-			FadeOutWeight = 1.0f;
-		}
-		else if (Curve.FadeOutTime > 0.0f)
-		{
-			FadeOutWeight = EasingSin((EndTime - ElapsedTime) / Curve.FadeOutTime);
-		}
-
-		break;
-	}
-
-	const float FadeWeight = FadeInWeight * FadeOutWeight;
+	FadeWeight = FadeWeight * FadeIn * FadeOut;
 
 	check(0.0f <= FadeWeight && FadeWeight <= 1.0f);
 
 	return FadeWeight;
 }
 
+void FCubismMotion::SetWeight(float MotionWeight)
+{
+	this->Weight = MotionWeight;
+}
+
+float FCubismMotion::GetWeight() const
+{
+	return Weight;
+}
+void FCubismMotion::SetFadeout(float NewFadeOutSeconds)
+{
+	this->FadeOutSeconds = NewFadeOutSeconds;
+	bIsTriggeredFadeOut = true;
+}
+
 void FCubismMotion::FadeOut(const float Time)
 {
 	State = ECubismMotionState::Play;
 
-	const float NewEndTime = FadeOutTime + Time - StartTime;
+	const float NewEndTime = FadeOutTime + Time;
 
 	if (NewEndTime < EndTime)
 	{
 		EndTime = NewEndTime;
 	}
+}
+
+void FCubismMotion::StartFadeout(float NewFadeOutSeconds, float UserTimeSeconds)
+{
+	const float NewEndTimeSeconds = UserTimeSeconds + NewFadeOutSeconds;
+	bIsTriggeredFadeOut = true;
+
+	if (EndTimeSeconds < 0.0f || NewEndTimeSeconds < EndTimeSeconds)
+	{
+		EndTimeSeconds = NewEndTimeSeconds;
+	}
+}
+
+bool FCubismMotion::IsTriggeredFadeOut()
+{
+	return bIsTriggeredFadeOut;
+}
+
+float FCubismMotion::GetFadeOutSeconds()
+{
+	return FadeOutSeconds;
+}
+
+float FCubismMotion::GetEndTime()
+{
+	return EndTimeSeconds;
+}
+
+void FCubismMotion::IsFinished(bool F)
+{
+	bFinished = F;
+}
+
+bool FCubismMotion::IsFinished() const
+{
+	return bFinished;
 }

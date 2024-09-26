@@ -16,7 +16,7 @@ struct FCubismLookAtParameter;
 /**
  * A component to apply the look-at effect to the specified parameters of the Cubism model.
  */
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class LIVE2DCUBISMFRAMEWORK_API UCubismLookAtComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -37,7 +37,7 @@ public:
 	/**
 	 * The smoothing value of the look-at effect.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism", meta=(ClampMin = "0.0001", ClampMax = "1.0", SliderMin = "0.0001", SliderMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism", meta = (ClampMin = "0.0001", ClampMax = "1.0", SliderMin = "0.0001", SliderMax = "1.0"))
 	float Smoothing = 0.15f;
 
 public:
@@ -75,15 +75,6 @@ private:
 	 * @param DeltaTime The time interval between the previous frame and the current frame.
 	 */
 	FVector SmoothDamp(const FVector CurrentValue, const float DeltaTime);
-
-	float FaceTargetX;
-	float FaceTargetY;
-	float FaceX;
-	float FaceY;
-	float FaceVX;
-	float FaceVY;
-	float LastTimeSeconds;
-	float UserTimeSeconds;
 
 public:
 	// UObject interface

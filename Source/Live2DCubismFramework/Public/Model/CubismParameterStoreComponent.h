@@ -30,6 +30,20 @@ public:
 	void Setup(UCubismModelComponent* InModel);
 
 	/**
+	 * @brief The function to save the value of a parameter at the specified index.
+	 * @param ParameterIndex The index of the parameter.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	void SaveParameterValue(const int32 ParameterIndex);
+
+	/**
+	 * @brief The function to save the opacity of a part at the specified index.
+	 * @param PartIndex The index of the part.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	void SavePartOpacity(const int32 PartIndex);
+
+	/**
 	 * @brief The function to save the parameters.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")

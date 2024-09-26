@@ -37,6 +37,16 @@ void UCubismParameterStoreComponent::Setup(UCubismModelComponent* InModel)
 	Model->ParameterStore = this;
 }
 
+void UCubismParameterStoreComponent::SaveParameterValue(const int32 ParameterIndex)
+{
+	ParameterValues.Add(ParameterIndex, Model->GetParameter(ParameterIndex)->GetParameterValue());
+}
+
+void UCubismParameterStoreComponent::SavePartOpacity(const int32 PartIndex)
+{
+	PartOpacities.Add(PartIndex, Model->GetPart(PartIndex)->Opacity);
+}
+
 void UCubismParameterStoreComponent::SaveParameters()
 {
 	for (const TObjectPtr<UCubismParameterComponent>& Parameter : Model->Parameters)

@@ -52,8 +52,8 @@ void UCubismParameterComponent::Setup(UCubismModelComponent* InModel)
 		Value = 0.0f;
 	}
 
-	check(!TMathUtil<float>::IsNaN(MaximumValue));
-	check(!TMathUtil<float>::IsNaN(MinimumValue));
+	check(!FGenericPlatformMath::IsNaN(MaximumValue));
+	check(!FGenericPlatformMath::IsNaN(MinimumValue));
 	check(MaximumValue > MinimumValue);
 }
 
@@ -64,7 +64,7 @@ float UCubismParameterComponent::GetParameterValue() const
 
 void UCubismParameterComponent::SetParameterValue(float TargetValue, const float Weight)
 {
-	if (!TMathUtil<float>::IsNaN(MinimumValue) && !TMathUtil<float>::IsNaN(MaximumValue))
+	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
 	{
 		TargetValue = FMath::Clamp(TargetValue, MinimumValue, MaximumValue);
 	}
@@ -80,7 +80,7 @@ void UCubismParameterComponent::AddParameterValue(float TargetValue, const float
 {
 	float CurrentValue = Model->GetParameterValue(Index) + TargetValue * Weight;
 
-	if (!TMathUtil<float>::IsNaN(MinimumValue) && !TMathUtil<float>::IsNaN(MaximumValue))
+	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
 	{
 		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
 	}
@@ -94,7 +94,7 @@ void UCubismParameterComponent::MultiplyParameterValue(float TargetValue, const 
 {
 	float CurrentValue = Model->GetParameterValue(Index) * (1.0f + (TargetValue - 1.0f) * Weight);
 
-	if (!TMathUtil<float>::IsNaN(MinimumValue) && !TMathUtil<float>::IsNaN(MaximumValue))
+	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
 	{
 		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
 	}
@@ -126,6 +126,11 @@ void UCubismParameterComponent::PostEditChangeProperty(FPropertyChangedEvent& Pr
 		const float CurrentValue = (MaximumValue - MinimumValue) * Value + MinimumValue;
 
 		Model->SetParameterValue(Index, CurrentValue);
+
+		if(Model->ParameterStore)
+		{
+			Model->ParameterStore->SaveParameterValue(Index);
+		}
 	}
 }
 #endif

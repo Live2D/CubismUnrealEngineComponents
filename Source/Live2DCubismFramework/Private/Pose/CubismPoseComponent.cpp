@@ -202,6 +202,8 @@ void UCubismPoseComponent::DoFade(float DeltaTime)
 
 				Part->SetPartOpacity(Opacity);
 			}
+
+			Model->ParameterStore->SavePartOpacity(Part->Index);
 		}
 	}
 }
@@ -223,6 +225,7 @@ void UCubismPoseComponent::CopyPartOpacities()
 			for (const TObjectPtr<UCubismPartComponent>& LinkPart : PartParam.LinkParts)
 			{
 				LinkPart->SetPartOpacity(Opacity);
+				Model->ParameterStore->SavePartOpacity(LinkPart->Index);
 			}
 		}
 	}

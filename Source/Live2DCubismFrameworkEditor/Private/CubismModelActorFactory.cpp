@@ -46,11 +46,6 @@ void UCubismModelActorFactory::PostSpawnActor(UObject* Asset, AActor* NewActor)
 	NewActor->SetActorLocation(GEditor->ClickLocation);
 }
 
-void UCubismModelActorFactory::PostCreateBlueprint(UObject* Asset, AActor* CDO)
-{
-
-}
-
 void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& ModelActor, const TObjectPtr<UCubismModel3Json>& Model3Json)
 {
 	UCubismModelComponent* Model = NewObject<UCubismModelComponent>(ModelActor, TEXT("CubismModel"), RF_Transactional);
@@ -70,13 +65,6 @@ void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& Model
 		ModelActor->AddInstanceComponent(Model);
 	}
 
-	{
-		UCubismRendererComponent* Renderer = NewObject<UCubismRendererComponent>(Model, TEXT("CubismRenderer"), RF_Transactional);
-
-		Renderer->RegisterComponent();
-		ModelActor->AddInstanceComponent(Renderer);
-	}
-
 	// setup cubism parameter store
 	{
 		UCubismParameterStoreComponent* ParameterStore = NewObject<UCubismParameterStoreComponent>(Model, TEXT("CubismParameterStore"), RF_Transactional);
@@ -84,16 +72,20 @@ void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& Model
 		ParameterStore->RegisterComponent();
 	}
 
-	// load physics3.json
-	const TObjectPtr<UCubismPhysics3Json>& Physics3Json = LoadPhysics3Json(Model3Json);
-	if (Physics3Json != nullptr)
+	// load motion3.json
+	const TArray<FMotion3JsonGroup>& Motion3JsonGroups = LoadMotion3Jsons(Model3Json);
+	if (Motion3JsonGroups.Num() != 0)
 	{
-		UCubismPhysicsComponent* Physics = NewObject<UCubismPhysicsComponent>(Model, TEXT("CubismPhysics"));
+		UCubismMotionComponent* Motion = NewObject<UCubismMotionComponent>(Model, TEXT("CubismMotion"), RF_Transactional);
 
-		Physics->Json = Physics3Json;
+		Motion->Jsons.Empty();
+		for (const FMotion3JsonGroup& Group : Motion3JsonGroups)
+		{
+			Motion->Jsons.Append(Group.Motion3Jsons);
+		}
 
-		Physics->RegisterComponent();
-		ModelActor->AddInstanceComponent(Physics);
+		Motion->RegisterComponent();
+		ModelActor->AddInstanceComponent(Motion);
 	}
 
 	// load pose3.json
@@ -119,34 +111,6 @@ void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& Model
 
 		Expression->RegisterComponent();
 		ModelActor->AddInstanceComponent(Expression);
-	}
-
-	// load motion3.json
-	const TArray<FMotion3JsonGroup>& Motion3JsonGroups = LoadMotion3Jsons(Model3Json);
-	if (Motion3JsonGroups.Num() != 0)
-	{
-		UCubismMotionComponent* Motion = NewObject<UCubismMotionComponent>(Model, TEXT("CubismMotion"), RF_Transactional);
-
-		Motion->Jsons.Empty();
-		for (const FMotion3JsonGroup& Group : Motion3JsonGroups)
-		{
-			Motion->Jsons.Append(Group.Motion3Jsons);
-		}
-
-		Motion->RegisterComponent();
-		ModelActor->AddInstanceComponent(Motion);
-	}
-
-	// load userdata3.json
-	const TObjectPtr<UCubismUserData3Json>& UserData3Json = LoadUserData3Json(Model3Json);
-	if (UserData3Json != nullptr)
-	{
-		UCubismUserDataComponent* UserData = NewObject<UCubismUserDataComponent>(Model, TEXT("CubismUserData"), RF_Transactional);
-
-		UserData->Json = UserData3Json;
-
-		UserData->RegisterComponent();
-		ModelActor->AddInstanceComponent(UserData);
 	}
 
 	// setup eye blink if exists
@@ -181,6 +145,37 @@ void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& Model
 
 		Raycast->RegisterComponent();
 		ModelActor->AddInstanceComponent(Raycast);
+	}
+
+	// load physics3.json
+	const TObjectPtr<UCubismPhysics3Json>& Physics3Json = LoadPhysics3Json(Model3Json);
+	if (Physics3Json != nullptr)
+	{
+		UCubismPhysicsComponent* Physics = NewObject<UCubismPhysicsComponent>(Model, TEXT("CubismPhysics"));
+
+		Physics->Json = Physics3Json;
+
+		Physics->RegisterComponent();
+		ModelActor->AddInstanceComponent(Physics);
+	}
+
+	{
+		UCubismRendererComponent* Renderer = NewObject<UCubismRendererComponent>(Model, TEXT("CubismRenderer"), RF_Transactional);
+
+		Renderer->RegisterComponent();
+		ModelActor->AddInstanceComponent(Renderer);
+	}
+
+	// load userdata3.json
+	const TObjectPtr<UCubismUserData3Json>& UserData3Json = LoadUserData3Json(Model3Json);
+	if (UserData3Json != nullptr)
+	{
+		UCubismUserDataComponent* UserData = NewObject<UCubismUserDataComponent>(Model, TEXT("CubismUserData"), RF_Transactional);
+
+		UserData->Json = UserData3Json;
+
+		UserData->RegisterComponent();
+		ModelActor->AddInstanceComponent(UserData);
 	}
 }
 

@@ -102,13 +102,68 @@ public:
 	 * @param Time The current time.
 	 * @return The weight of the fade in and the fade in/out.
 	 */
-	float CalcWeight(const FString Id, const float ElapsedTime) const;
+	float UpdateFadeWeight(const TSharedPtr<FCubismMotion>& CubismMotion, float UserTimeSeconds);
 
 	/**
 	 * The function to fade out the motion.
 	 * @param Time The start time of the fade out.
 	 */
 	void FadeOut(const float Time);
+
+	/**
+	 * The function to set weight value.
+	 *  @param The weight value of the motion.
+	 */
+	void SetWeight(float weight);
+
+	/**
+	 * The function to get weight value.
+	 * @return The weight value of the motion.
+	 */
+	float GetWeight() const;
+
+	/**
+	 * Set the time when fade out ends.
+	 * @param The time at which the fade ends.
+	 */
+	void SetFadeout(float NewFadeOutSeconds);
+
+	/**
+	 * Initiate fade out.
+	 * @param The time at which the fade ends.
+	 * @param Time The current time.
+	 */
+	void StartFadeout(float NewFadeOutSeconds, float UserTimeSeconds);
+
+	/**
+	 * Whether fade out has started.
+	 * @return True if the fade out flag is set.
+	 */
+	bool IsTriggeredFadeOut();
+
+	/**
+	 * Get fade out time.
+	 * @return The fade out time.
+	 */
+	float GetFadeOutSeconds();
+
+	/**
+	 * End time of motion playback.
+	 * @return Time at which motion playback ends.
+	 */
+	float GetEndTime();
+
+	/**
+	 * Whether the motion has finished playing or not.
+	 * @param True if the motion has finished playing.
+	 */
+	void IsFinished(bool F);
+
+	/**
+	 * Whether the motion has finished playing or not.
+	 * @return True if the motion has finished playing.
+	 */
+	bool IsFinished() const;
 
 private:
 	friend class UCubismMotionComponent;
@@ -137,4 +192,14 @@ private:
 	{
 		return CurveTable->FindRichCurve(*Id, Id)->Eval(Time, 0.0f);
 	}
+
+	float Weight;
+
+	float FadeOutSeconds;
+
+	float EndTimeSeconds;
+
+	bool bIsTriggeredFadeOut;
+
+	bool bFinished;
 };

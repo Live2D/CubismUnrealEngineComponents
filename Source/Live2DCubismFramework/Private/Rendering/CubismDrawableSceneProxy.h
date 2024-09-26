@@ -10,9 +10,10 @@
 
 #include "PrimitiveSceneProxy.h"
 #include "DynamicMeshBuilder.h"
-#include "MaterialDomain.h"
 #include "Materials/Material.h"
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 #include "Materials/MaterialRenderProxy.h"
+#endif
 
 /**
  * Dynamic mesh data for a drawable.

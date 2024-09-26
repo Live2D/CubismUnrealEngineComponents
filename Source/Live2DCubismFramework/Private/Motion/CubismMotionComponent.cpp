@@ -86,7 +86,7 @@ void UCubismMotionComponent::PlayMotion(const int32 InIndex, const float OffsetT
 
 	for (const TSharedPtr<FCubismMotion>& Motion : MotionQueue)
 	{
-		Motion->FadeOut(Time);
+		Motion->SetFadeout(Motion->FadeOutTime);
 	}
 
 	TSharedPtr<FCubismMotion> NextMotion = MakeShared<FCubismMotion>(Json, OffsetTime);
@@ -124,18 +124,11 @@ void UCubismMotionComponent::PostEditChangeProperty(struct FPropertyChangedEvent
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	const FName PropertyName = PropertyChangedEvent.Property? PropertyChangedEvent.Property->GetFName() : NAME_None;
+	const FName PropertyName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismMotionComponent, Index))
 	{
-		if (Jsons.IsValidIndex(Index))
-		{
-			PlayMotion(Index, 0.0f, ECubismMotionPriority::Force);
-		}
-		else
-		{
-			StopAllMotions();
-		}
+		PlayMotion(Index, 0.0f, ECubismMotionPriority::Force);
 	}
 }
 #endif
@@ -167,26 +160,32 @@ void UCubismMotionComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 
 	Time += Speed * DeltaTime;
 
-	for (const TSharedPtr<FCubismMotion>& Motion : MotionQueue)
+	for (int32 i = 0; i < MotionQueue.Num();)
 	{
+		TSharedPtr<FCubismMotion>& Motion = MotionQueue[i];
+
 		if (Motion->State == ECubismMotionState::None)
 		{
 			// Initialize the motion.
 			Motion->Init(Time);
 		}
 
-		UpdateMotion(Motion);
-	}
+		float FadeWeight = Motion->UpdateFadeWeight(Motion, Time);
 
-	Model->ParameterStore->SaveParameters();
+		UpdateMotion(Time, FadeWeight, Motion);
 
-	for (int32 i = MotionQueue.Num()-1; i >= 0; i--)
-	{
-		const TSharedPtr<FCubismMotion>& Motion = MotionQueue[i];
-
-		if (Motion->State == ECubismMotionState::End)
+		if (Motion->IsFinished())
 		{
 			MotionQueue.RemoveAt(i);
+		}
+		else
+		{
+			if (Motion->IsTriggeredFadeOut())
+			{
+				Motion->StartFadeout(Motion->GetFadeOutSeconds(), Time);
+			}
+
+			i++;
 		}
 	}
 
@@ -199,68 +198,155 @@ void UCubismMotionComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 }
 // End of UActorComponent interface
 
-void UCubismMotionComponent::UpdateMotion(const TSharedPtr<FCubismMotion>& Motion)
+void UCubismMotionComponent::UpdateMotion(float UserTimeSeconds, float FadeWeight, const TSharedPtr<FCubismMotion>& CubismMotion)
 {
-	float ElapsedTime = Time - Motion->StartTime;
+	float TimeOffsetSeconds = UserTimeSeconds - CubismMotion->StartTime;
 
-	if (Motion->State == ECubismMotionState::PlayInLoop)
+	if (TimeOffsetSeconds < 0.0f)
 	{
-		while (ElapsedTime > Motion->Duration)
+		TimeOffsetSeconds = 0.0f;
+	}
+
+	const float TmpFadeIn = (CubismMotion->FadeInTime <= 0.0f)
+		? 1.0f
+		: FCubismMotion::EasingSin((UserTimeSeconds - CubismMotion->EndTime) / CubismMotion->FadeInTime);
+
+	const float TmpFadeOut = (CubismMotion->FadeOutTime <= 0.0f || CubismMotion->EndTime < 0.0f)
+		? 1.0f
+		: FCubismMotion::EasingSin((CubismMotion->EndTime - UserTimeSeconds) / CubismMotion->FadeOutTime);
+
+	// 'Repeat' time as necessary.
+	float MotionTime = TimeOffsetSeconds;
+
+	if (CubismMotion->State == ECubismMotionState::PlayInLoop)
+	{
+		while (MotionTime > CubismMotion->Duration)
 		{
-			ElapsedTime -= Motion->Duration;
+			MotionTime -= CubismMotion->Duration;
 		}
 	}
 
-    for (const FCubismMotionCurve& Curve : Motion->Curves)
-    {
-		const float Value = Motion->GetValue(Curve.Id, ElapsedTime);
+	TArray<FCubismMotionCurve> Curves = CubismMotion->Curves;
 
-        switch (Curve.Target)
-        {
-            case ECubismMotionCurveTarget::Model:
-            {
-                Model->Opacity = Value;
-
-                break;
-            }
-            case ECubismMotionCurveTarget::Parameter:
-            {
-                if (UCubismParameterComponent* DstParameter = Model->GetParameter(Curve.Id))
-                {
-    				const float FadeWeight = Motion->CalcWeight(Curve.Id, ElapsedTime);
-
-                    DstParameter->SetParameterValue(Value, FadeWeight);
-                }
-
-                break;
-            }
-            case ECubismMotionCurveTarget::PartOpacity:
-            {
-				UCubismParameterComponent* DstParameter = Model->GetParameter(Curve.Id);
-
-				check(DstParameter);
-
-				DstParameter->SetParameterValue(Value);
-
-                break;
-            }
-            default:
-            {
-                ensure(false);
-                break;
-            }
-        }
-    }
-
-	if (Time - Motion->StartTime > Motion->Duration)
+	// Evaluate model curves.
+	for (const FCubismMotionCurve& Curve : Curves)
 	{
-		if (Motion->State == ECubismMotionState::PlayInLoop)
+		if (Curve.Target != ECubismMotionCurveTarget::Model)
 		{
-			Motion->StartTime = Time;
+			continue;
+		}
+
+		// Evaluate curve and call handler.
+		float Value = CubismMotion->GetValue(Curve.Id, MotionTime);
+
+		if (Curve.Id == "PartOpacity")
+		{
+			Model->Opacity = Value;
+		}
+	}
+
+	for (const FCubismMotionCurve& Curve : Curves)
+	{
+		if (Curve.Target != ECubismMotionCurveTarget::Parameter)
+		{
+			continue;
+		}
+
+		// Find parameter.
+		UCubismParameterComponent* Parameter = Model->GetParameter(Curve.Id);
+
+		// Skip curve evaluation if no value in sink.
+		if (!Parameter)
+		{
+			continue;
+		}
+
+		const float SourceValue = Parameter->GetParameterValue();
+
+		// Evaluate curve and apply value.
+		float Value = CubismMotion->GetValue(Curve.Id, MotionTime);
+
+
+		float NewValue;
+		// Fade per parameter.
+		if (Curve.FadeInTime < 0.0f && Curve.FadeOutTime < 0.0f)
+		{
+			//Apply motion fade.
+			NewValue = SourceValue + (Value - SourceValue) * FadeWeight;
 		}
 		else
 		{
-			Motion->State = ECubismMotionState::End;
+			// If fade-in or fade-out is set for a parameter, apply it.
+			float FadeInWeight;
+			float FadeOutWeight;
+
+			if (Curve.FadeInTime < 0.0f)
+			{
+				FadeInWeight = TmpFadeIn;
+			}
+			else
+			{
+				FadeInWeight = Curve.FadeInTime == 0.0f
+					? 1.0f
+					: FCubismMotion::EasingSin((UserTimeSeconds - CubismMotion->StartTime) / Curve.FadeInTime);
+			}
+
+			if (Curve.FadeOutTime < 0.0f)
+			{
+				FadeOutWeight = TmpFadeOut;
+			}
+			else
+			{
+				FadeOutWeight = (Curve.FadeOutTime == 0.0f || CubismMotion->EndTime < 0.0f)
+					? 1.0f
+					: FCubismMotion::EasingSin((UserTimeSeconds - CubismMotion->EndTime) / Curve.FadeOutTime);
+			}
+
+			const float ParamWeight = CubismMotion->GetWeight() * FadeInWeight * FadeOutWeight;
+
+			// Apply fade per parameter.
+			NewValue = SourceValue + (Value - SourceValue) * ParamWeight;
+		}
+
+		Parameter->SetParameterValue(NewValue);
+	}
+
+	for (const FCubismMotionCurve& Curve : Curves)
+	{
+		if (Curve.Target != ECubismMotionCurveTarget::PartOpacity)
+		{
+			continue;
+		}
+
+		// Find parameter.
+		UCubismParameterComponent* Parameter = Model->GetParameter(Curve.Id);
+
+		// Skip curve evaluation if no value in sink.
+		if (!Parameter)
+		{
+			continue;
+		}
+
+		// Evaluate curve and apply value.
+		float Value = CubismMotion->GetValue(Curve.Id, MotionTime);
+
+		Parameter->SetParameterValue(Value);
+	}
+
+	if ((CubismMotion->GetEndTime() > 0.0f) && (CubismMotion->GetEndTime() < UserTimeSeconds))
+	{
+		CubismMotion->IsFinished(true);
+	}
+
+	if (Time - CubismMotion->StartTime > CubismMotion->Duration)
+	{
+		if (CubismMotion->State == ECubismMotionState::PlayInLoop)
+		{
+			CubismMotion->StartTime = UserTimeSeconds;
+		}
+		else
+		{
+			CubismMotion->IsFinished(true);
 		}
 	}
 }

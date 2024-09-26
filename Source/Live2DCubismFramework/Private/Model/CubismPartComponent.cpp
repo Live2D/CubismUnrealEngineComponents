@@ -42,7 +42,7 @@ void UCubismPartComponent::Setup(UCubismModelComponent* InModel)
 		Opacity = 1.0f;
 	}
 
-	check(!TMathUtil<float>::IsNaN(Opacity));
+	check(!FGenericPlatformMath::IsNaN(Opacity));
 }
 
 void UCubismPartComponent::SetPartOpacity(float TargetOpacity)
@@ -72,6 +72,11 @@ void UCubismPartComponent::PostEditChangeProperty(FPropertyChangedEvent& Propert
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismPartComponent, Opacity))
 	{
 		Model->SetPartOpacity(Index, Opacity);
+
+		if(Model->ParameterStore)
+		{
+			Model->ParameterStore->SavePartOpacity(Index);
+		}
 	}
 }
 #endif

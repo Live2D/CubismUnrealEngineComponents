@@ -8,30 +8,76 @@
 
 #pragma once
 
-#include "BatchedElements.h"
+#include "ShaderParameterStruct.h"
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+#include "DataDrivenShaderPlatformInfo.h"
+#endif
 
-class FCubismMaskBatchedElementParameters : public FBatchedElementParameters
+struct FCubismMeshMaskVertex
 {
-public:
-	FCubismMaskBatchedElementParameters(
-		const FVector4 InOffset,
-		const FVector4 InChannel,
-		const FTextureResource* InMainTexture
-	)
-		: Offset(InOffset)
-		, Channel(InChannel)
-		, MainTexture(InMainTexture)
-	{ }
+	FVector2f Position; // ATTRIBUTE0
+	FVector2f UV;       // ATTRIBUTE1
+};
 
-	virtual void BindShaders(FRHICommandList& RHICmdList, FGraphicsPipelineStateInitializer& GraphicsPSOInit, ERHIFeatureLevel::Type InFeatureLevel, const FMatrix& InTransform, const float InGamma, const FMatrix& ColorWeights, const FTexture* Texture) override;
+struct FMaskDrawInfo
+{
+	TArray<uint16> Indices;
+	TArray<FCubismMeshMaskVertex> Vertices;
+	FVector4 Offset;
+	FVector4 Channel;
+	FTexture* MainTexture;
+};
 
-protected:
-	/** The offset of the mask to be drawn. */
-	const FVector4 Offset;
+/*** Cubism Mask Shader ***/
 
-	/** The channel of the mask to be drawn. */
-	const FVector4 Channel;
+void DrawMask_RenderThread(FRHICommandList& RHICmdList, FTextureRenderTargetResource* RenderTargetResource, const TArray<FMaskDrawInfo>& MaskDrawInfos);
 
-	/** The texture assigned to the drawable. */
-	const FTextureResource* MainTexture;
+class FCubismMeshMaskVS : public FGlobalShader
+{
+	DECLARE_GLOBAL_SHADER(FCubismMeshMaskVS);
+
+	FCubismMeshMaskVS() {}
+	FCubismMeshMaskVS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
+		: FGlobalShader(Initializer)
+	{
+		Offset.Bind(Initializer.ParameterMap, TEXT("Offset"));
+	}
+
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	{
+		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+	}
+
+	#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+	void SetParameters(FRHIBatchedShaderParameters& BatchedParameters, const FVector4& InOffset)
+	{
+		SetShaderValue(BatchedParameters, Offset, (FVector4f)InOffset);
+	}
+	#else
+	template<typename TShaderRHIParamRef>
+	void SetParameters(FRHICommandList& RHICmdList, const TShaderRHIParamRef ShaderRHI, const FVector4& InOffset)
+	{
+		SetShaderValue(RHICmdList, ShaderRHI, Offset, (FVector4f)InOffset);
+	}
+	#endif
+
+private:
+	LAYOUT_FIELD(FShaderParameter, Offset);
+};
+
+class FCubismMeshMaskPS : public FGlobalShader
+{
+	DECLARE_GLOBAL_SHADER(FCubismMeshMaskPS);
+	SHADER_USE_PARAMETER_STRUCT(FCubismMeshMaskPS, FGlobalShader);
+
+	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+		SHADER_PARAMETER(FVector4f, Channel)
+		SHADER_PARAMETER_TEXTURE(Texture2D, MainTexture)
+		SHADER_PARAMETER_SAMPLER(SamplerState, MainSampler)
+	END_SHADER_PARAMETER_STRUCT()
+
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	{
+		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+	}
 };

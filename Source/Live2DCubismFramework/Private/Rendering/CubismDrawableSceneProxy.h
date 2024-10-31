@@ -8,25 +8,7 @@
 
 #pragma once
 
-#include "PrimitiveSceneProxy.h"
-#include "DynamicMeshBuilder.h"
-#include "Materials/Material.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
-#include "Materials/MaterialRenderProxy.h"
-#endif
-
-/**
- * Dynamic mesh data for a drawable.
- */
-struct FCubismDrawableDynamicMeshData
-{
-	int32 Index;
-	TArray<uint32> Indices;
-	FColor Color;
-	TArray<FVector3f> Positions;
-	TArray<FVector2f> UVs;
-	bool bTwoSided;
-};
+#include "CubismRenderingResource.h"
 
 /**
  * A representation of a UCubismDrawableComponent on the rendering thread.
@@ -34,14 +16,69 @@ struct FCubismDrawableDynamicMeshData
 class FCubismDrawableSceneProxy : public FPrimitiveSceneProxy
 {
 public:
-	FCubismDrawableSceneProxy(const TObjectPtr<UCubismDrawableComponent>& Drawable)
+	FCubismDrawableSceneProxy(const TObjectPtr<UCubismDrawableComponent>& Drawable, FCubismDrawableDynamicMeshData InDynamicData)
 		: FPrimitiveSceneProxy(Drawable)
+		, DynamicData(InDynamicData)
 		, MaterialInstance(Drawable->GetMaterial(0))
 		, MaterialRelevance(Drawable->GetMaterialRelevance(GetScene().GetFeatureLevel()))
+		, VertexBuffer(nullptr)
+		, IndexBuffer(nullptr)
+		, VertexFactory(nullptr)
 	{
+		ENQUEUE_RENDER_COMMAND(InitCubismDrawableSceneProxy)(
+			[this](FRHICommandListImmediate& RHICmdList)
+			{
+				if (!VertexBuffer)
+				{
+					VertexBuffer = new FCubismDrawableVertexBuffer(DynamicData);
+					#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+					VertexBuffer->InitResource(RHICmdList);
+					#else
+					VertexBuffer->InitResource();
+					#endif
+				}
+
+				if (!IndexBuffer)
+				{
+					IndexBuffer = new FCubismDrawableIndexBuffer(DynamicData);
+					#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+					IndexBuffer->InitResource(RHICmdList);
+					#else
+					IndexBuffer->InitResource();
+					#endif
+				}
+
+				if (!VertexFactory)
+				{
+					VertexFactory = new FCubismDrawableVertexFactory(GetScene().GetFeatureLevel(), VertexBuffer);
+					#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+					VertexFactory->InitResource(RHICmdList);
+					#else
+					VertexFactory->InitResource();
+					#endif
+				}
+			}
+		);
 	}
 
-	virtual ~FCubismDrawableSceneProxy() { }
+	virtual ~FCubismDrawableSceneProxy() 
+	{ 
+		if (VertexFactory)
+		{
+			VertexFactory->ReleaseResource();
+			delete VertexFactory;
+		}
+		if (VertexBuffer)
+		{
+			VertexBuffer->ReleaseResource();
+			delete VertexBuffer;
+		}
+		if (IndexBuffer)
+		{
+			IndexBuffer->ReleaseResource();
+			delete IndexBuffer;
+		}
+	}
 
 	SIZE_T GetTypeHash() const override
 	{
@@ -56,9 +93,14 @@ public:
 		FMeshElementCollector& Collector
 	) const override
 	{
+		if (DynamicData.Positions.Num() == 0)
+		{
+			return;
+		}
+
 		const bool bWireframe = AllowDebugViewmodes() && ViewFamily.EngineShowFlags.Wireframe;
 
-		FMaterialRenderProxy* MaterialProxy = nullptr;
+		FMaterialRenderProxy* MaterialRenderProxy = nullptr;
 		if (bWireframe)
 		{
 			FColoredMaterialRenderProxy* WireframeMaterialInstance = new FColoredMaterialRenderProxy(
@@ -67,24 +109,11 @@ public:
 			);
 
 			Collector.RegisterOneFrameMaterialProxy(WireframeMaterialInstance);
-			MaterialProxy = WireframeMaterialInstance;
+			MaterialRenderProxy = WireframeMaterialInstance;
 		}
 		else
 		{
-			MaterialProxy = MaterialInstance->GetRenderProxy();
-		}
-
-		TArray<FDynamicMeshVertex> Vertices;
-		for (int32 i = 0; i < DynamicData.Positions.Num(); i++)
-		{
-			FDynamicMeshVertex Vertex;
-
-			Vertex.SetTangents(FVector3f(1.0f,0.0f,0.0f), FVector3f(0.0f,1.0f,0.0f), FVector3f(0.0f,0.0f,1.0f));
-			Vertex.Color = DynamicData.Color;
-			Vertex.Position = DynamicData.Positions[i];
-			Vertex.TextureCoordinate[0] = DynamicData.UVs[i];
-
-			Vertices.Add(Vertex);
+			MaterialRenderProxy = MaterialInstance->GetRenderProxy();
 		}
 
 		for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
@@ -93,18 +122,32 @@ public:
 			{
 				const FSceneView* View = Views[ViewIndex];
 
-				FDynamicMeshBuilder Builder(View->GetFeatureLevel());
-				Builder.AddVertices(Vertices);
-				Builder.AddTriangles(DynamicData.Indices);
-				Builder.GetMesh(
-					GetLocalToWorld(),
-					MaterialProxy,
-					SDPG_World,
-					DynamicData.bTwoSided,
-					false,
-					ViewIndex,
-					Collector
-				);
+				FMeshBatch& Mesh = Collector.AllocateMesh();
+				Mesh.ReverseCulling = IsLocalToWorldDeterminantNegative();
+				Mesh.bDisableBackfaceCulling = DynamicData.bTwoSided;
+				Mesh.Type = PT_TriangleList;
+
+				Mesh.VertexFactory = VertexFactory;
+				Mesh.MaterialRenderProxy = MaterialRenderProxy;
+
+				FMeshBatchElement& BatchElement = Mesh.Elements[0];
+
+				FDynamicPrimitiveUniformBuffer& DynamicPrimitiveUniformBuffer = Collector.AllocateOneFrameResource<FDynamicPrimitiveUniformBuffer>();
+				#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 4
+				DynamicPrimitiveUniformBuffer.Set(Collector.GetRHICommandList(), GetLocalToWorld(), GetLocalToWorld(), GetBounds(), GetLocalBounds(), false, false, AlwaysHasVelocity());
+				#else
+				DynamicPrimitiveUniformBuffer.Set(GetLocalToWorld(), GetLocalToWorld(), GetBounds(), GetLocalBounds(), false, false, AlwaysHasVelocity());
+				#endif
+				BatchElement.PrimitiveUniformBufferResource = &DynamicPrimitiveUniformBuffer.UniformBuffer;
+
+				BatchElement.IndexBuffer = IndexBuffer;
+
+				BatchElement.FirstIndex = 0;
+				BatchElement.NumPrimitives = IndexBuffer->Indices.Num() / 3;
+				BatchElement.MinVertexIndex = 0;
+				BatchElement.MaxVertexIndex = VertexBuffer->Positions.Num() - 1;
+
+				Collector.AddMesh(ViewIndex, Mesh);
 			}
 		}
 	}
@@ -126,6 +169,19 @@ public:
 
 	virtual uint32 GetMemoryFootprint(void) const override { return(sizeof(*this) + GetAllocatedSize()); }
 
+	void UpdateDynamicData(const FCubismDrawableDynamicMeshData& NewDynamicData)
+	{
+		DynamicData = NewDynamicData;
+		if (VertexBuffer)
+		{
+			VertexBuffer->UpdateBuffer(DynamicData.Positions, DynamicData.UVs);
+		}
+		if (IndexBuffer)
+		{
+			IndexBuffer->UpdateBuffer(DynamicData.Indices);
+		}
+	}
+
 public:
 	/** Dynamic mesh data for the drawable. */
 	FCubismDrawableDynamicMeshData DynamicData;
@@ -136,4 +192,9 @@ private:
 
 	/** The material relevance for the drawable. */
 	FMaterialRelevance MaterialRelevance;
+
+	/** Dynamic rendering resources */
+	mutable FCubismDrawableVertexBuffer* VertexBuffer;
+	mutable FCubismDrawableIndexBuffer* IndexBuffer;
+	mutable FCubismDrawableVertexFactory* VertexFactory;
 };

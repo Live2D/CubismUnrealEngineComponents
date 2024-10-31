@@ -11,11 +11,7 @@
 #include "Model/CubismDrawableComponent.h"
 #include "Rendering/CubismRendererComponent.h"
 #include "Rendering/CubismMaskJunction.h"
-#include "Rendering/CubismShaders.h"
-#include "Engine/Canvas.h"
 #include "Engine/TextureRenderTarget2D.h"
-#include "Kismet/KismetRenderingLibrary.h"
-#include "ClearQuad.h"
 #include "CubismLog.h"
 #include <math.h>
 
@@ -238,8 +234,6 @@ void UCubismMaskTextureComponent::TickComponent(float DeltaTime, ELevelTick Tick
 		bDirty = false;
 	}
 
-	UWorld* World = GetWorld();
-
 	for (const TObjectPtr<UTextureRenderTarget2D>& RenderTarget : RenderTargets)
 	{
 		if (!IsValid(RenderTarget))
@@ -247,27 +241,7 @@ void UCubismMaskTextureComponent::TickComponent(float DeltaTime, ELevelTick Tick
 			continue;
 		}
 
-		// Clear the render target.
-		FTextureRenderTargetResource* RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
-		ENQUEUE_RENDER_COMMAND(ClearRTCommand)(
-			[RenderTargetResource](FRHICommandList& RHICmdList)
-			{
-				FRHIRenderPassInfo RPInfo(RenderTargetResource->GetRenderTargetTexture(), ERenderTargetActions::DontLoad_Store);
-				RHICmdList.Transition(FRHITransitionInfo(RenderTargetResource->GetRenderTargetTexture(), ERHIAccess::Unknown, ERHIAccess::RTV));
-				RHICmdList.BeginRenderPass(RPInfo, TEXT("ClearRT"));
-				DrawClearQuad(RHICmdList, FLinearColor::Transparent);
-				RHICmdList.EndRenderPass();
-
-				RHICmdList.Transition(FRHITransitionInfo(RenderTargetResource->GetRenderTargetTexture(), ERHIAccess::RTV, ERHIAccess::SRVMask));
-			}
-		);
-
-		UCanvas* Canvas;
-		FVector2D CanvasSize;
-		FDrawToRenderTargetContext Context;
-
-		// Draw a new mask to the render target.
-		UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(World, RenderTarget, Canvas, CanvasSize, Context);
+		TArray<FMaskDrawInfo> MaskDrawInfos;
 
 		for (const TObjectPtr<ACubismModel>& ModelActor : Models)
 		{
@@ -301,42 +275,43 @@ void UCubismMaskTextureComponent::TickComponent(float DeltaTime, ELevelTick Tick
 						continue;
 					}
 
-					TArray<FCanvasUVTri> Tris;
+					const TArray<int32>& Indices = MaskDrawable->GetVertexIndices();
+					const TArray<FVector2D>& Positions = MaskDrawable->GetVertexPositions();
+					const TArray<FVector2D>& UVs = MaskDrawable->GetVertexUvs();
 
-					const TArray<int32> Indices = MaskDrawable->GetVertexIndices();
-					const TArray<FVector2D> Positions = MaskDrawable->GetVertexPositions();
-					const TArray<FVector2D> Uvs = MaskDrawable->GetVertexUvs();
+					FMaskDrawInfo DrawInfo;
 
-					// Collect the vertices of the drawable that make up the mask.
-					for (int32 i = 0; i < Indices.Num(); i += 3)
+					for (int32 i = 0; i < Indices.Num(); ++i)
 					{
-						const int32 Idx0 = Indices[i  ];
-						const int32 Idx1 = Indices[i+1];
-						const int32 Idx2 = Indices[i+2];
-
-						FCanvasUVTri Tri;
-
-						Tri.V0_Pos = Positions[Idx0];
-						Tri.V1_Pos = Positions[Idx1];
-						Tri.V2_Pos = Positions[Idx2];
-
-						Tri.V0_UV = Uvs[Idx0];
-						Tri.V1_UV = Uvs[Idx1];
-						Tri.V2_UV = Uvs[Idx2];
-
-						Tris.Add(Tri);
+						DrawInfo.Indices.Add((uint16)Indices[i]);
 					}
+					for (int32 i = 0; i < Positions.Num(); ++i)
+					{
+						FCubismMeshMaskVertex Vertex;
 
-					FCanvasTriangleItem TriangleItem(Tris, Texture->GetResource());
+						Vertex.Position = (FVector2f)Positions[i];
+						Vertex.UV = (FVector2f)UVs[i];
 
-					TriangleItem.BatchedElementParameters = new FCubismMaskBatchedElementParameters(Junction->Offset, Junction->Channel, Texture->GetResource());
+						DrawInfo.Vertices.Add(Vertex);
+					}
+					DrawInfo.Offset = Junction->Offset;
+					DrawInfo.Channel = Junction->Channel;
+					DrawInfo.MainTexture = Texture->GetResource();
 
-					Canvas->DrawItem(TriangleItem);
+					MaskDrawInfos.Add(DrawInfo);
 				}
 			}
 		}
 
-		UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(World, Context);
+		FTextureRenderTargetResource* RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+
+		// Draw the mask to the render target.
+		ENQUEUE_RENDER_COMMAND(DrawMaskCommand)(
+			[this, RenderTargetResource, MaskDrawInfos](FRHICommandList& RHICmdList)
+			{
+				DrawMask_RenderThread(RHICmdList, RenderTargetResource, MaskDrawInfos);
+			}
+		);
 	}
 }
 // End of UActorComponent interface

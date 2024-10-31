@@ -7,91 +7,119 @@
 
 
 #include "Rendering/CubismShaders.h"
+#include "ClearQuad.h"
 
-#include "ShaderParameterUtils.h"
-#include "ShaderParameterStruct.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
-#include "DataDrivenShaderPlatformInfo.h"
-#endif
-#include "BatchedElements.h"
-#include "RenderResource.h"
-#include "GlobalShader.h"
-
-/*** Cubism Mask Shader ***/
-
-class FCubismMeshMaskVS : public FGlobalShader
+class FCubismMeshMaskVertexDeclaration : public FRenderResource
 {
-	DECLARE_GLOBAL_SHADER(FCubismMeshMaskVS);
+public:
+	FVertexDeclarationRHIRef VertexDeclarationRHI;
 
-	FCubismMeshMaskVS() {}
-	FCubismMeshMaskVS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
-		: FGlobalShader(Initializer)
+	virtual ~FCubismMeshMaskVertexDeclaration() {}
+
+	#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+	virtual void InitRHI(FRHICommandListBase& RHICmdList) override
+	#else
+	virtual void InitRHI() override
+	#endif
 	{
-		Scale.Bind(Initializer.ParameterMap, TEXT("Scale"));
-		Offset.Bind(Initializer.ParameterMap, TEXT("Offset"));
+		FVertexDeclarationElementList Elements;
+		uint16 Stride = sizeof(FCubismMeshMaskVertex);
+		Elements.Add(FVertexElement(0, STRUCT_OFFSET(FCubismMeshMaskVertex, Position), VET_Float2, 0, Stride));
+		Elements.Add(FVertexElement(0, STRUCT_OFFSET(FCubismMeshMaskVertex, UV), VET_Float2, 1, Stride));
+		VertexDeclarationRHI = PipelineStateCache::GetOrCreateVertexDeclaration(Elements);
 	}
 
-	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	virtual void ReleaseRHI() override
 	{
-		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+		VertexDeclarationRHI.SafeRelease();
 	}
-
-	template<typename TShaderRHIParamRef>
-	void SetParameters(FRHICommandList& RHICmdList, const TShaderRHIParamRef ShaderRHI, const FVector4& InOffset)
-	{
-		#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-		FRHIBatchedShaderParameters& BatchedParameters = RHICmdList.GetScratchShaderParameters();
-		SetShaderValue(BatchedParameters, Offset, FVector4f(InOffset));
-		RHICmdList.SetBatchedShaderParameters(ShaderRHI, BatchedParameters);
-		#else
-		SetShaderValue(RHICmdList, ShaderRHI, Offset, FVector4f(InOffset));
-		#endif
-	}
-
-protected:
-	LAYOUT_FIELD(FShaderParameter, Scale);
-	LAYOUT_FIELD(FShaderParameter, Offset);
 };
 
-class FCubismMeshMaskPS : public FGlobalShader
+TGlobalResource<FCubismMeshMaskVertexDeclaration> GCubismMeshMaskVertexDeclaration;
+
+void DrawMask_RenderThread(FRHICommandList& RHICmdList, FTextureRenderTargetResource* RenderTargetResource, const TArray<FMaskDrawInfo>& MaskDrawInfos)
 {
-	DECLARE_GLOBAL_SHADER(FCubismMeshMaskPS);
-	SHADER_USE_PARAMETER_STRUCT(FCubismMeshMaskPS, FGlobalShader);
+	FRHIRenderPassInfo RPInfo(RenderTargetResource->GetRenderTargetTexture(), ERenderTargetActions::DontLoad_Store);
+	RHICmdList.BeginRenderPass(RPInfo, TEXT("DrawMask"));
 
-	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
-	{
-		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
-	}
+	// Clear the render target.
+	DrawClearQuad(RHICmdList, FLinearColor::Transparent);
 
-	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER(FVector4f, Channel)
-		SHADER_PARAMETER_TEXTURE(Texture2D, MainTexture)
-		SHADER_PARAMETER_SAMPLER(SamplerState, MainSampler)
-	END_SHADER_PARAMETER_STRUCT()
-};
+	TShaderMapRef<FCubismMeshMaskVS> VertexShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+	TShaderMapRef<FCubismMeshMaskPS> PixelShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 
-void FCubismMaskBatchedElementParameters::BindShaders(FRHICommandList& RHICmdList, FGraphicsPipelineStateInitializer& GraphicsPSOInit, ERHIFeatureLevel::Type InFeatureLevel, const FMatrix& InTransform, const float InGamma, const FMatrix& ColorWeights, const FTexture* Texture)
-{
-	TShaderMapRef<FCubismMeshMaskVS> VertexShader(GetGlobalShaderMap(InFeatureLevel));
-	TShaderMapRef<FCubismMeshMaskPS> PixelShader(GetGlobalShaderMap(InFeatureLevel));
+	FGraphicsPipelineStateInitializer GraphicsPSOInit;
+	RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
 
-	GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GSimpleElementVertexDeclaration.VertexDeclarationRHI;
+	GraphicsPSOInit.RasterizerState = TStaticRasterizerState<FM_Solid, CM_None>::GetRHI();
+	GraphicsPSOInit.BlendState = TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_One, BO_Add, BF_One, BF_One>::GetRHI();
+	GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
+
+	GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GCubismMeshMaskVertexDeclaration.VertexDeclarationRHI;
 	GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
 	GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
 	GraphicsPSOInit.PrimitiveType = PT_TriangleList;
-	GraphicsPSOInit.BlendState = TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_One, BO_Add, BF_One, BF_One>::GetRHI();
 
-	RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
 	SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, 0);
 
-	VertexShader->SetParameters(RHICmdList, VertexShader.GetVertexShader(), Offset);
+	for (const FMaskDrawInfo& DrawInfo : MaskDrawInfos)
+	{
+		#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+		FRHIBatchedShaderParameters& BatchedParameters = RHICmdList.GetScratchShaderParameters();
+		VertexShader->SetParameters(BatchedParameters, DrawInfo.Offset);
+		RHICmdList.SetBatchedShaderParameters(VertexShader.GetVertexShader(), BatchedParameters);
+		#else
+		VertexShader->SetParameters(RHICmdList, VertexShader.GetVertexShader(), DrawInfo.Offset);
+		#endif
 
-	FCubismMeshMaskPS::FParameters ShaderParameters;
-	ShaderParameters.Channel = (FVector4f)Channel;
-	ShaderParameters.MainTexture = MainTexture->TextureRHI;
-	ShaderParameters.MainSampler = TStaticSamplerState<>::GetRHI();
+		FCubismMeshMaskPS::FParameters ParametersPS;
+		ParametersPS.Channel = (FVector4f)DrawInfo.Channel;
+		ParametersPS.MainTexture = DrawInfo.MainTexture->TextureRHI;
+		ParametersPS.MainSampler = TStaticSamplerState<>::GetRHI();
 
-	SetShaderParameters(RHICmdList, PixelShader, PixelShader.GetPixelShader(), ShaderParameters);
+		SetShaderParameters(RHICmdList, PixelShader, PixelShader.GetPixelShader(), ParametersPS);
+
+		int32 NumVerts = DrawInfo.Vertices.Num();
+		int32 NumIndices = DrawInfo.Indices.Num();
+
+		{
+			FRHIResourceCreateInfo VertexBufferInfo(TEXT("MaskVertexBuffer"));
+			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+			FBufferRHIRef VertexBuffer = RHICmdList.CreateVertexBuffer(sizeof(FCubismMeshMaskVertex) * NumVerts, BUF_Volatile, VertexBufferInfo);
+			#else
+			FBufferRHIRef VertexBuffer = RHICreateVertexBuffer(sizeof(FCubismMeshMaskVertex) * NumVerts, BUF_Volatile, VertexBufferInfo);
+			#endif
+			void* VertexBufferData = RHICmdList.LockBuffer(VertexBuffer, 0, sizeof(FCubismMeshMaskVertex) * NumVerts, RLM_WriteOnly);
+			FMemory::Memcpy(VertexBufferData, DrawInfo.Vertices.GetData(), sizeof(FCubismMeshMaskVertex) * NumVerts);
+			RHICmdList.UnlockBuffer(VertexBuffer);
+
+			// Bind the vertex buffers
+			RHICmdList.SetStreamSource(0, VertexBuffer, 0);
+
+			// Release the vertex buffer
+			VertexBuffer.SafeRelease();
+		}
+
+		{
+			FRHIResourceCreateInfo IndexBufferInfo(TEXT("MaskIndexBuffer"));
+			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+			FBufferRHIRef IndexBuffer = RHICmdList.CreateIndexBuffer(sizeof(uint16), sizeof(uint16) * NumIndices, BUF_Volatile, IndexBufferInfo);
+			#else
+			FBufferRHIRef IndexBuffer = RHICreateIndexBuffer(sizeof(uint16), sizeof(uint16) * NumIndices, BUF_Volatile, IndexBufferInfo);
+			#endif
+			void* IndexBufferData = RHICmdList.LockBuffer(IndexBuffer, 0, sizeof(uint16) * NumIndices, RLM_WriteOnly);
+			FMemory::Memcpy(IndexBufferData, DrawInfo.Indices.GetData(), sizeof(uint16) * NumIndices);
+			RHICmdList.UnlockBuffer(IndexBuffer);
+
+			// Issue the draw call
+			RHICmdList.DrawIndexedPrimitive(IndexBuffer, 0, 0, NumVerts, 0, NumIndices / 3, 1);
+
+			// Release the index buffer
+			IndexBuffer.SafeRelease();
+		}
+	}
+
+	RHICmdList.EndRenderPass();
 }
 
 IMPLEMENT_GLOBAL_SHADER(FCubismMeshMaskVS, "/Plugin/Live2DCubismSDK/Private/CubismMeshMask.usf", "MainVS", SF_Vertex);

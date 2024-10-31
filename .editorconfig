@@ -1,0 +1,32 @@
+# This setting refers to https://github.com/EpicGames/UnrealEngine/blob/release/.editorconfig .
+
+# top-most EditorConfig file
+root = true
+
+# Baseline
+[*]
+charset = utf-8
+indent_style = tab
+indent_size = 4
+tab_width = 4
+trim_trailing_whitespace = false
+max_line_length = 150
+
+# ReSharper properties
+resharper_cpp_keep_user_linebreaks = false
+resharper_cpp_wrap_lines = false
+resharper_cpp_wrap_before_colon = true
+resharper_cpp_line_break_before_comma_in_member_initializer_lists = true
+
+# MSBuild
+[*.{csproj,proj,projitems,shproj,fsproj,target,props}]
+indent_style = space
+indent_size = 2
+
+# XML config files
+[*.{config,nuspec,resx,natvis}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

@@ -3,11 +3,11 @@
 float4 Offset;
 
 void MainVS(
-	in float4 InPosition : ATTRIBUTE0, in float2 InUV : ATTRIBUTE2,
+	in float2 InPosition : ATTRIBUTE0, in float2 InUV : ATTRIBUTE1,
 	out float4 OutPosition : SV_POSITION, out float2 OutUV : TEXCOORD0
 )
 {
-	OutPosition = InPosition;
+	OutPosition = float4(InPosition.xy, 0.0, 1.0);
 
 	OutPosition.xy += Offset.xy;
 	OutPosition.xy *= Offset.z;

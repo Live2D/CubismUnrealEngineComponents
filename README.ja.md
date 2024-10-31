@@ -70,7 +70,7 @@ Cubismファイルをuassetファイルに変換する機能は `./Source/Live2D
 
 | ライブラリ / ツール | バージョン |
 | --- | --- |
-| Visual Studio 2022 | 17.11.4 |
+| Visual Studio 2022 | 17.11.5 |
 | Windows SDK | 10.0.22621.0 |
 
 ## テスト済みの環境

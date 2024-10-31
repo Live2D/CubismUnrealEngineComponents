@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Model/CubismModelActor.h"
+#include "Rendering/CubismShaders.h"
 
 #include "CubismMaskTextureComponent.generated.h"
 

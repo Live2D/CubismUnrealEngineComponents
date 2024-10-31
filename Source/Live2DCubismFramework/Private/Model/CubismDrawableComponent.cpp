@@ -264,27 +264,24 @@ void UCubismDrawableComponent::SendRenderDynamicData_Concurrent()
 		FCubismDrawableDynamicMeshData NewDynamicData;
 
 		NewDynamicData.Index = Index;
-		NewDynamicData.Indices.Append(VertexIndices);
 
 		for (const FVector2D& LocalPosition : GetVertexPositions())
 		{
 			NewDynamicData.Positions.Add(FVector3f(ToGlobalPosition(LocalPosition)));
 		}
 
-		for (const FVector2D& Uv : GetVertexUvs())
+		for (const FVector2D& UV : GetVertexUvs())
 		{
-			NewDynamicData.UVs.Add(FVector2f(Uv));
+			NewDynamicData.UVs.Add(FVector2f(UV));
 		}
 
-		NewDynamicData.Color = BaseColor.ToRGBE();
-		NewDynamicData.Color.A *= Opacity;
-
+		NewDynamicData.Indices.Append(VertexIndices);
 		NewDynamicData.bTwoSided = bTwoSided;
 
 		ENQUEUE_RENDER_COMMAND(DrawableUpdateDynamicData)(
 			[DrawableProxy, NewDynamicData](FRHICommandListImmediate& RHICommandList)
 			{
-				DrawableProxy->DynamicData = NewDynamicData;
+				DrawableProxy->UpdateDynamicData(NewDynamicData);
 			}
 		);
 	}
@@ -357,6 +354,23 @@ FBoxSphereBounds UCubismDrawableComponent::CalcBounds(const FTransform& LocalToW
 //~ Begin UPrimitiveComponent Interface
 FPrimitiveSceneProxy* UCubismDrawableComponent::CreateSceneProxy()
 {
-	return new FCubismDrawableSceneProxy(this);
+	FCubismDrawableDynamicMeshData DynamicData;
+
+	DynamicData.Index = Index;
+
+	for (const FVector2D& LocalPosition : GetVertexPositions())
+	{
+		DynamicData.Positions.Add(FVector3f(ToGlobalPosition(LocalPosition)));
+	}
+
+	for (const FVector2D& UV : GetVertexUvs())
+	{
+		DynamicData.UVs.Add(FVector2f(UV));
+	}
+
+	DynamicData.Indices.Append(VertexIndices);
+	DynamicData.bTwoSided = bTwoSided;
+
+	return new FCubismDrawableSceneProxy(this, DynamicData);
 }
 //~ End UPrimitiveComponent Interface

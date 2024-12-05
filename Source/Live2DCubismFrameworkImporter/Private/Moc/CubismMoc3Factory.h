@@ -8,13 +8,15 @@
 
 #pragma once
 
+#include "EditorReimportHandler.h"
+
 #include "CubismMoc3Factory.generated.h"
 
 /**
  * A factory for creating Cubism moc assets from moc3 files.
  */
 UCLASS()
-class UCubismMoc3Factory : public UFactory
+class UCubismMoc3Factory : public UFactory, public FReimportHandler
 {
 	GENERATED_BODY()
 
@@ -27,4 +29,10 @@ class UCubismMoc3Factory : public UFactory
 		UObject* Context, const TCHAR* Type, const uint8*& Buffer, const uint8* BufferEnd,
 		FFeedbackContext * Warn
 	) override;
+
+	//~ Begin FReimportHandler Interface
+	virtual bool CanReimport(UObject* Obj, TArray<FString>& OutFilenames) override;
+	virtual void SetReimportPaths(UObject* Obj, const TArray<FString>& NewReimportPaths) override;
+	virtual EReimportResult::Type Reimport(UObject* Obj) override;
+	//~ End FReimportHandler Interface
 };

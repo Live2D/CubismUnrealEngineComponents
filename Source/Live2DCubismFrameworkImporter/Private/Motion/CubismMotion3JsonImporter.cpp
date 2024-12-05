@@ -52,11 +52,17 @@ bool FCubismMotion3JsonImporter::ImportFromString(const FString& FileContent)
 		(*Meta)->TryGetNumberField(TEXT("FadeInTime"), FadeInTime);
 		(*Meta)->TryGetNumberField(TEXT("FadeOutTime"), FadeOutTime);
 		ASSERT((*Meta)->TryGetBoolField(TEXT("Loop"), bLoop), "Failed to get Loop field.");
+		ASSERT((*Meta)->TryGetNumberField(TEXT("CurveCount"), CurveCount), "Failed to get CurveCount field.");
+		ASSERT((*Meta)->TryGetNumberField(TEXT("TotalSegmentCount"), TotalSegmentCount), "Failed to get TotalSegmentCount field.");
+		ASSERT((*Meta)->TryGetNumberField(TEXT("TotalPointCount"), TotalPointCount), "Failed to get TotalPointCount field.");
 	}
 
 	const TArray< TSharedPtr<FJsonValue> >*  CurvesArrayObject;
 	ASSERT(JsonObject->TryGetArrayField(TEXT("Curves"), CurvesArrayObject), "Failed to get Curves field.");
 	{
+		int32 NumSegments = 0;
+		int32 NumPoints = 0;
+
 		for (const TSharedPtr<FJsonValue>& CurveValue : *CurvesArrayObject)
 		{
 			FCubismMotionCurve Curve;
@@ -98,9 +104,26 @@ bool FCubismMotion3JsonImporter::ImportFromString(const FString& FileContent)
 					Segments.Add(SegmentValue->AsNumber());
 				}
 
-				MotionCurves.Add(*Curve.Id, Segments);
+				MotionCurves.Add(*Curve.Id, ParseSegments(Segments, NumSegments, NumPoints));
 			}
+		}
 
+		if (Curves.Num() != CurveCount)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Curves count mismatch. Expected: %d, Actual: %d"), CurveCount, Curves.Num());
+			return false;
+		}
+
+		if (NumSegments != TotalSegmentCount)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Segments count mismatch. Expected: %d, Actual: %d"), TotalSegmentCount, NumSegments);
+			return false;
+		}
+
+		if (NumPoints != TotalPointCount)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Points count mismatch. Expected: %d, Actual: %d"), TotalPointCount, NumPoints);
+			return false;
 		}
 	}
 
@@ -121,17 +144,18 @@ void FCubismMotion3JsonImporter::ApplyParams(EObjectFlags Flags, const TObjectPt
 	for (const auto& Entry : MotionCurves)
 	{
 		FRichCurve& Curve = CurveTable->AddRichCurve(Entry.Key);
-		Curve.SetKeys(ParseSegments(Entry.Value));
+		Curve.SetKeys(Entry.Value);
 	}
 
 	Json->CurveTable = CurveTable;
 }
 
-TArray<FRichCurveKey> FCubismMotion3JsonImporter::ParseSegments(const TArray<float> &Segments) const
+TArray<FRichCurveKey> FCubismMotion3JsonImporter::ParseSegments(const TArray<float> &Segments, int32& NumSegments, int32& NumPoints) const
 {
 	TArray<FRichCurveKey> KeyFrames;
 
 	KeyFrames.Add(FRichCurveKey(Segments[0], Segments[1]));
+	NumPoints += 1;
 
 	int32 i = 2;
 	while (i < Segments.Num())
@@ -154,6 +178,7 @@ TArray<FRichCurveKey> FCubismMotion3JsonImporter::ParseSegments(const TArray<flo
 				KeyFrames.Add(K1);
 
 				i += 3;
+				NumPoints += 1;
 
 				break;
 			}
@@ -187,6 +212,7 @@ TArray<FRichCurveKey> FCubismMotion3JsonImporter::ParseSegments(const TArray<flo
 				KeyFrames.Add(K1);
 
 				i += 7;
+				NumPoints += 3;
 
 				break;
 			}
@@ -203,6 +229,7 @@ TArray<FRichCurveKey> FCubismMotion3JsonImporter::ParseSegments(const TArray<flo
 				KeyFrames.Add(K1);
 
 				i += 3;
+				NumPoints += 1;
 
 				break;
 			}
@@ -223,6 +250,7 @@ TArray<FRichCurveKey> FCubismMotion3JsonImporter::ParseSegments(const TArray<flo
 				KeyFrames.Add(K2);
 
 				i += 3;
+				NumPoints += 1;
 
 				break;
 			}
@@ -233,6 +261,8 @@ TArray<FRichCurveKey> FCubismMotion3JsonImporter::ParseSegments(const TArray<flo
 				break;
 			}
 		}
+
+		NumSegments += 1;
 	}
 
 	return KeyFrames;

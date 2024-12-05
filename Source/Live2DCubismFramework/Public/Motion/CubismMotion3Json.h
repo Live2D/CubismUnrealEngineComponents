@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "EditorFramework/AssetImportData.h"
+
 #include "CubismMotion3Json.generated.h"
 
 /**
@@ -133,6 +135,18 @@ public:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Motion Data")
 	TArray<FCubismMotionEvent> Events;
+
+#if WITH_EDITORONLY_DATA
+	// Import data for this 
+	UPROPERTY(VisibleAnywhere, Instanced, Category=ImportSettings)
+	TObjectPtr<class UAssetImportData> AssetImportData;
+
+	// UObject interface
+	virtual void PostInitProperties() override;
+	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
+	virtual void Serialize(FArchive& Ar) override;
+	// End of UObject interface
+#endif
 };
 
 /**

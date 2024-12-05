@@ -23,7 +23,7 @@ public:
 private:
 	static TSharedPtr<FJsonObject> ParseJSON(const FString& FileContent, bool bSilent);
 
-	TArray<FRichCurveKey> ParseSegments(const TArray<float>& Segments) const;
+	TArray<FRichCurveKey> ParseSegments(const TArray<float>& Segments, int32& NumSegments, int32& NumPoints) const;
 
 protected:
 	int32 Version;
@@ -38,9 +38,15 @@ protected:
 
 	float FadeOutTime = 1.0f;
 
+	int32 CurveCount;
+
+	int32 TotalSegmentCount;
+
+	int32 TotalPointCount;
+
 	TArray<FCubismMotionCurve> Curves;
 
-	TMap<FName, TArray<float>> MotionCurves;
+	TMap<FName, TArray<FRichCurveKey>> MotionCurves;
 
 	TArray<FCubismMotionEvent> Events;
 };

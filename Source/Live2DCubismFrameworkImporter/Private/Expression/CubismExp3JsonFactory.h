@@ -8,13 +8,15 @@
 
 #pragma once
 
+#include "EditorReimportHandler.h"
+
 #include "CubismExp3JsonFactory.generated.h"
 
 /**
  * A factory for creating Cubism expression json assets from exp3.json files.
  */
 UCLASS()
-class UCubismExp3JsonFactory : public UFactory
+class UCubismExp3JsonFactory : public UFactory, public FReimportHandler
 {
 	GENERATED_BODY()
 
@@ -27,4 +29,10 @@ class UCubismExp3JsonFactory : public UFactory
 		UObject* Context, const TCHAR* Type, const TCHAR*& Buffer, const TCHAR* BufferEnd,
 		FFeedbackContext* Warn
 	) override;
+
+	//~ Begin FReimportHandler Interface
+	virtual bool CanReimport(UObject* Obj, TArray<FString>& OutFilenames) override;
+	virtual void SetReimportPaths(UObject* Obj, const TArray<FString>& NewReimportPaths) override;
+	virtual EReimportResult::Type Reimport(UObject* Obj) override;
+	//~ End FReimportHandler Interface
 };

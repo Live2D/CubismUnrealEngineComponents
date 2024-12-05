@@ -21,13 +21,13 @@ UCubismMoc3Factory::UCubismMoc3Factory()
 	bEditorImport = true;
 	bText = false;
 
-	Formats.Add(TEXT("moc3;Cubism Model Binary file"));
+	Formats.Add(TEXT("moc3;Cubism Moc Binary file"));
 }
 
 
 FText UCubismMoc3Factory::GetToolTip() const
 {
-	return NSLOCTEXT("Live2D Cubism Framework", "CubismMoc3FactoryDescription", "Model exported from Live2D Cubism Editor");
+	return NSLOCTEXT("Live2D Cubism Framework", "CubismMoc3FactoryDescription", "Moc exported from Live2D Cubism Editor");
 }
 
 bool UCubismMoc3Factory::FactoryCanImport(const FString& Filename)
@@ -67,4 +67,71 @@ UObject* UCubismMoc3Factory::FactoryCreateBinary
 	Result->Setup();
 
 	return Result;
+}
+
+bool UCubismMoc3Factory::CanReimport(UObject* Obj, TArray<FString>& OutFilenames)
+{
+	UCubismMoc3* Moc = Cast<UCubismMoc3>(Obj);
+	if (Moc && Moc->AssetImportData)
+	{
+		Moc->AssetImportData->ExtractFilenames(OutFilenames);
+		return true;
+	}
+	return false;
+}
+
+void UCubismMoc3Factory::SetReimportPaths(UObject* Obj, const TArray<FString>& NewReimportPaths)
+{
+	UCubismMoc3* Moc = Cast<UCubismMoc3>(Obj);
+	if (Moc && ensure(NewReimportPaths.Num() == 1))
+	{
+		Moc->AssetImportData->UpdateFilenameOnly(NewReimportPaths[0]);
+	}
+}
+
+EReimportResult::Type UCubismMoc3Factory::Reimport(UObject* Obj)
+{
+	UCubismMoc3* Moc = Cast<UCubismMoc3>(Obj);
+	if (!Moc)
+	{
+		return EReimportResult::Failed;
+	}
+
+	const FString Filename = Moc->AssetImportData->GetFirstFilename();
+	if (!Filename.Len())
+	{
+		return EReimportResult::Failed;
+	}
+
+	if (IFileManager::Get().FileSize(*Filename) == INDEX_NONE)
+	{
+		UE_LOG(LogCubism, Warning, TEXT("Cannot reimport: source file '%s' cannot be found."), *Filename);
+		return EReimportResult::Failed;
+	}
+
+	bool OutCanceled = false;
+
+	if (ImportObject(Moc->GetClass(), Moc->GetOuter(), *Moc->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled))
+	{
+		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
+
+		Moc->AssetImportData->Update(Filename);
+
+		Moc->MarkPackageDirty();
+
+		return EReimportResult::Succeeded;
+	}
+	else
+	{
+		if (OutCanceled)
+		{
+			UE_LOG(LogCubism, Warning, TEXT("Reimport was canceled"));
+			return EReimportResult::Cancelled;
+		}
+		else
+		{
+			UE_LOG(LogCubism, Error, TEXT("Reimport failed"));
+			return EReimportResult::Failed;
+		}
+	}
 }

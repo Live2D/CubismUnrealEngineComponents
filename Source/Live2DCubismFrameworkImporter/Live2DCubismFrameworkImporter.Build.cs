@@ -44,6 +44,7 @@ public class Live2DCubismFrameworkImporter : ModuleRules
 				"Json",
 				"Engine",
 				"UnrealEd",
+				"AssetDefinition",
 				"Live2DCubismFramework",
 				// ... add private dependencies that you statically link with here ...	
 			}

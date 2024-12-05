@@ -8,13 +8,15 @@
 
 #pragma once
 
+#include "EditorReimportHandler.h"
+
 #include "CubismPose3JsonFactory.generated.h"
 
 /**
  * A factory for creating Cubism pose json assets from pose3.json files.
  */
 UCLASS()
-class UCubismPose3JsonFactory : public UFactory
+class UCubismPose3JsonFactory : public UFactory, public FReimportHandler
 {
 	GENERATED_BODY()
 
@@ -27,4 +29,10 @@ class UCubismPose3JsonFactory : public UFactory
 		UObject* Context, const TCHAR* Type, const TCHAR*& Buffer, const TCHAR* BufferEnd,
 		FFeedbackContext* Warn
 	) override;
+
+	//~ Begin FReimportHandler Interface
+	virtual bool CanReimport(UObject* Obj, TArray<FString>& OutFilenames) override;
+	virtual void SetReimportPaths(UObject* Obj, const TArray<FString>& NewReimportPaths) override;
+	virtual EReimportResult::Type Reimport(UObject* Obj) override;
+	//~ End FReimportHandler Interface
 };

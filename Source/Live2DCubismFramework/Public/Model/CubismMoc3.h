@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Live2DCubismCore.h"
+#include "EditorFramework/AssetImportData.h"
 
 #include "CubismMoc3.generated.h"
 
@@ -124,4 +125,16 @@ public:
 	// UObject interface
 	virtual void PostLoad() override;
 	// End of UObject interface
+
+#if WITH_EDITORONLY_DATA
+	// Import data for this 
+	UPROPERTY(VisibleAnywhere, Instanced, Category=ImportSettings)
+	TObjectPtr<class UAssetImportData> AssetImportData;
+
+	// UObject interface
+	virtual void PostInitProperties() override;
+	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
+	virtual void Serialize(FArchive& Ar) override;
+	// End of UObject interface
+#endif
 };

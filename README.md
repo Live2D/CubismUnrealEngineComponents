@@ -66,7 +66,6 @@ Resources like shaders and other assets are located in `./Content/Materials`.
 | Unreal Editor 5.4 | 5.4.4 |
 | Unreal Editor 5.3 | 5.3.2 |
 | Unreal Editor 5.2 | 5.2.1 |
-| Unreal Editor 5.1 | 5.1.1 |
 
 | Library / Tool | Version |
 | --- | --- |

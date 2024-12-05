@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "EditorFramework/AssetImportData.h"
+
 #include "CubismUserData3Json.generated.h"
 
 /**
@@ -55,4 +57,16 @@ public:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "User Data")
 	TMap<ECubismUserDataTargetType, FCubismUserDataEntry> Data;
+
+#if WITH_EDITORONLY_DATA
+	// Import data for this 
+	UPROPERTY(VisibleAnywhere, Instanced, Category=ImportSettings)
+	TObjectPtr<class UAssetImportData> AssetImportData;
+
+	// UObject interface
+	virtual void PostInitProperties() override;
+	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
+	virtual void Serialize(FArchive& Ar) override;
+	// End of UObject interface
+#endif
 };

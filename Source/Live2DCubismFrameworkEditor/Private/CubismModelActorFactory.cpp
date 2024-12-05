@@ -209,7 +209,7 @@ TObjectPtr<UCubismMoc3> UCubismModelActorFactory::LoadMoc(const TObjectPtr<UCubi
 }
 
 TArray<TObjectPtr<UTexture2D>> UCubismModelActorFactory::LoadTextures(const TObjectPtr<UCubismModel3Json>& Model3Json)
-{	
+{
 	TArray<TObjectPtr<UTexture2D>> Textures;
 
 	const FString& LongPackagePath = FPackageName::GetLongPackagePath(Model3Json->GetOutermost()->GetPathName());
@@ -219,6 +219,18 @@ TArray<TObjectPtr<UTexture2D>> UCubismModelActorFactory::LoadTextures(const TObj
 		const FString& AssetPath = GetAssetPath(LongPackagePath / TexturePath);
 
 		TObjectPtr<UTexture2D> Texture = LoadObject<UTexture2D>(nullptr, *AssetPath);
+
+		// Workaround for when the texture is loaded as a normal map
+		if (!Texture->SRGB || Texture->CompressionSettings != TC_Default || Texture->LODGroup != TEXTUREGROUP_World)
+		{
+			Texture->SRGB = true;
+			Texture->CompressionSettings = TC_Default;
+			Texture->LODGroup = TEXTUREGROUP_World;
+
+			Texture->UpdateResource();
+
+			Texture->MarkPackageDirty();
+		}
 
 		Textures.Add(Texture);
 	}

@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Model/CubismModelComponent.h"
+#include "EditorFramework/AssetImportData.h"
 
 #include "CubismExp3Json.generated.h"
 
@@ -71,4 +72,16 @@ public:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Expression Data")
 	TArray<FCubismExpressionParameter> Parameters;
+
+#if WITH_EDITORONLY_DATA
+	// Import data for this 
+	UPROPERTY(VisibleAnywhere, Instanced, Category=ImportSettings)
+	TObjectPtr<class UAssetImportData> AssetImportData;
+
+	// UObject interface
+	virtual void PostInitProperties() override;
+	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
+	virtual void Serialize(FArchive& Ar) override;
+	// End of UObject interface
+#endif
 };

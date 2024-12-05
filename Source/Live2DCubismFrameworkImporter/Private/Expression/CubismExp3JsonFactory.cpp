@@ -8,11 +8,11 @@
 
 #include "CubismExp3JsonFactory.h"
 
-
 #include "Expression/CubismExp3Json.h"
 #include "Expression/CubismExp3JsonImporter.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
+#include "CubismLog.h"
 
 UCubismExp3JsonFactory::UCubismExp3JsonFactory() 
 {
@@ -58,7 +58,85 @@ UObject* UCubismExp3JsonFactory::FactoryCreateText
 		Result = NewObject<UCubismExp3Json>(InParent, InName, Flags);
 		
 		Importer.ApplyParams(Flags, Result);
+
+		// Update asset import data
+		if (Result->AssetImportData)
+		{
+			Result->AssetImportData->Update(CurrentFilename);
+		}
+		else
+		{
+			Result->AssetImportData = NewObject<UAssetImportData>(Result, TEXT("AssetImportData"));
+			Result->AssetImportData->Update(CurrentFilename);
+		}
 	}
 
 	return Result;
+}
+
+bool UCubismExp3JsonFactory::CanReimport(UObject* Obj, TArray<FString>& OutFilenames)
+{
+	UCubismExp3Json* Exp = Cast<UCubismExp3Json>(Obj);
+	if (Exp && Exp->AssetImportData)
+	{
+		Exp->AssetImportData->ExtractFilenames(OutFilenames);
+		return true;
+	}
+	return false;
+}
+
+void UCubismExp3JsonFactory::SetReimportPaths(UObject* Obj, const TArray<FString>& NewReimportPaths)
+{
+	UCubismExp3Json* Exp = Cast<UCubismExp3Json>(Obj);
+	if (Exp && ensure(NewReimportPaths.Num() == 1))
+	{
+		Exp->AssetImportData->UpdateFilenameOnly(NewReimportPaths[0]);
+	}
+}
+
+EReimportResult::Type UCubismExp3JsonFactory::Reimport(UObject* Obj)
+{
+	UCubismExp3Json* Exp = Cast<UCubismExp3Json>(Obj);
+	if (!Exp)
+	{
+		return EReimportResult::Failed;
+	}
+
+	const FString Filename = Exp->AssetImportData->GetFirstFilename();
+	if (!Filename.Len())
+	{
+		return EReimportResult::Failed;
+	}
+
+	if (IFileManager::Get().FileSize(*Filename) == INDEX_NONE)
+	{
+		UE_LOG(LogCubism, Warning, TEXT("Cannot reimport: source file '%s' cannot be found."), *Filename);
+		return EReimportResult::Failed;
+	}
+
+	bool OutCanceled = false;
+
+	if (ImportObject(Exp->GetClass(), Exp->GetOuter(), *Exp->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled))
+	{
+		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
+
+		Exp->AssetImportData->Update(Filename);
+
+		Exp->MarkPackageDirty();
+
+		return EReimportResult::Succeeded;
+	}
+	else
+	{
+		if (OutCanceled)
+		{
+			UE_LOG(LogCubism, Warning, TEXT("Reimport was canceled"));
+			return EReimportResult::Cancelled;
+		}
+		else
+		{
+			UE_LOG(LogCubism, Error, TEXT("Reimport failed"));
+			return EReimportResult::Failed;
+		}
+	}
 }

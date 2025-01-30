@@ -69,7 +69,7 @@ Resources like shaders and other assets are located in `./Content/Materials`.
 
 | Library / Tool | Version |
 | --- | --- |
-| Visual Studio 2022 | 17.11.5 |
+| Visual Studio 2022 | 17.12.4 |
 | Windows SDK | 10.0.22621.0 |
 
 ## Tested environment

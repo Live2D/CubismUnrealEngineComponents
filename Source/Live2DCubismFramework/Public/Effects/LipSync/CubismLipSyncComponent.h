@@ -18,7 +18,7 @@ class UCubismModel3Json;
  * A component to apply the lip sync effect to the specified parameters of the Cubism model.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), hidecategories = (Object, ActorComponent, Physics, Rendering, Mobility, LOD))
-class LIVE2DCUBISMFRAMEWORK_API UCubismLipSyncComponent : public USceneComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismLipSyncComponent : public UActorComponent
 {
 	GENERATED_BODY()
 

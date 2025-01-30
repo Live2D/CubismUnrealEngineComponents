@@ -52,8 +52,8 @@ void UCubismPhysicsComponent::Setup(UCubismModelComponent* InModel)
 		{
 			const UCubismParameterComponent* Parameter = Model->GetParameter(ParameterIndex);
 
-			ParameterCaches[ParameterIndex] = Parameter->GetParameterValue();
-			ParameterInputCaches[ParameterIndex] = Parameter->GetParameterValue();
+			ParameterCaches[ParameterIndex] = Parameter->Value;
+			ParameterInputCaches[ParameterIndex] = Parameter->Value;
 		}
 	}
 
@@ -121,10 +121,16 @@ void UCubismPhysicsComponent::Setup(UCubismModelComponent* InModel)
 		Initialize();
 	}
 
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	AddTickPrerequisiteComponent(Model->Pose); // must be updated at first because poses overwrite parameters
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
+	if (Model->Physics != this)
+	{
+		if (Model->Physics)
+		{
+			Model->Physics->DestroyComponent();
+		}
+		Model->Physics = this;
+	}
+
+	Model->AddTickPrerequisiteComponent(this); // model ticks after parameters are updated by components
 }
 
 void UCubismPhysicsComponent::Initialize()
@@ -155,7 +161,7 @@ void UCubismPhysicsComponent::Stabilization()
 
 		for (FCubismPhysicsRigInput& Input : Rig.Inputs)
 		{
-			const float Value = Input.Parameter->GetParameterValue();
+			const float Value = Input.Parameter->Value;
 
 			Input.GetNormalizedParameterValue(TotalTranslation, TotalAngle, Value, Rig.NormalizationPosition, Rig.NormalizationAngle);
 
@@ -183,7 +189,7 @@ void UCubismPhysicsComponent::Stabilization()
 				Output.PreviousValue = OutputValue;
 				Output.CurrentValue = OutputValue;
 
-				float TargetValue = Output.Parameter->GetParameterValue();
+				float TargetValue = Output.Parameter->Value;
 
 				Output.UpdateOutputParameterValue(TargetValue, OutputValue);
 
@@ -363,7 +369,7 @@ void UCubismPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		{
 			const UCubismParameterComponent* Parameter = Model->GetParameter(ParameterIndex);
 
-			ParameterCaches[ParameterIndex] = ParameterInputCaches[ParameterIndex] * (1.0f - InputWeight) + Parameter->GetParameterValue() * InputWeight;
+			ParameterCaches[ParameterIndex] = ParameterInputCaches[ParameterIndex] * (1.0f - InputWeight) + Parameter->Value * InputWeight;
 			ParameterInputCaches[ParameterIndex] = ParameterCaches[ParameterIndex];
 		}
 
@@ -422,7 +428,7 @@ void UCubismPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 			}
 
 			const float OutputValue = Output.PreviousValue * (1.0f - Weight) + Output.CurrentValue * Weight;
-			float TargetValue = Output.Parameter->GetParameterValue();
+			float TargetValue = Output.Parameter->Value;
 
 			Output.UpdateOutputParameterValue(TargetValue, OutputValue);
 

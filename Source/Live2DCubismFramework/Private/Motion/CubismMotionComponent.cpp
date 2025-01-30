@@ -19,7 +19,7 @@
 UCubismMotionComponent::UCubismMotionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
@@ -35,10 +35,16 @@ void UCubismMotionComponent::Setup(UCubismModelComponent* InModel)
 	Time = 0.0f;
 	MotionQueue.Empty();
 
-	Model->Motion = this;
+	if (Model->Motion != this)
+	{
+		if (Model->Motion)
+		{
+			Model->Motion->DestroyComponent();
+		}
+		Model->Motion = this;
+	}
 
 	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
 }
 
 bool UCubismMotionComponent::IsFinished() const
@@ -261,7 +267,7 @@ void UCubismMotionComponent::UpdateMotion(float UserTimeSeconds, float FadeWeigh
 			continue;
 		}
 
-		const float SourceValue = Parameter->GetParameterValue();
+		const float SourceValue = Parameter->Value;
 
 		// Evaluate curve and apply value.
 		float Value = CubismMotion->GetValue(Curve.Id, MotionTime);

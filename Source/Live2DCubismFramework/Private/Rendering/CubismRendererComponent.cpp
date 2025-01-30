@@ -80,7 +80,14 @@ void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 		TargetJunction->Drawables.AddUnique(Drawable);
 	}
 
-	Model->Renderer = this;
+	if (Model->Renderer != this)
+	{
+		if (Model->Renderer)
+		{
+			Model->Renderer->DestroyComponent();
+		}
+		Model->Renderer = this;
+	}
 
 	ApplyRenderOrder();
 

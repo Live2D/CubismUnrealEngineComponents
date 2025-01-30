@@ -124,6 +124,7 @@ private:
 public:
 	// UObject interface
 	virtual void PostLoad() override;
+	virtual void PostInitProperties() override;
 	// End of UObject interface
 
 #if WITH_EDITORONLY_DATA
@@ -132,7 +133,6 @@ public:
 	TObjectPtr<class UAssetImportData> AssetImportData;
 
 	// UObject interface
-	virtual void PostInitProperties() override;
 	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
 	virtual void Serialize(FArchive& Ar) override;
 	// End of UObject interface

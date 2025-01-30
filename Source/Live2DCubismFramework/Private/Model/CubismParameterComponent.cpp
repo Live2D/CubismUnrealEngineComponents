@@ -18,7 +18,6 @@ UCubismParameterComponent::UCubismParameterComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
 	bTickInEditor = true;
-	CreationMethod = EComponentCreationMethod::Instance;
 }
 
 void UCubismParameterComponent::Setup(UCubismModelComponent* InModel)
@@ -40,7 +39,7 @@ void UCubismParameterComponent::Setup(UCubismModelComponent* InModel)
 		MaximumValue = Model->GetParameterMaximumValue(Index);
 		MinimumValue = Model->GetParameterMinimumValue(Index);
 		DefaultValue = Model->GetParameterDefaultValue(Index);
-		Value = (Model->GetParameterValue(Index) - MinimumValue) / (MaximumValue - MinimumValue);
+		Value = Model->GetParameterValue(Index);
 	}
 	else
 	{
@@ -57,21 +56,16 @@ void UCubismParameterComponent::Setup(UCubismModelComponent* InModel)
 	check(MaximumValue > MinimumValue);
 }
 
-float UCubismParameterComponent::GetParameterValue() const
-{
-	return Model->GetParameterValue(Index);
-}
-
 void UCubismParameterComponent::SetParameterValue(float TargetValue, const float Weight)
 {
-	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
-	{
-		TargetValue = FMath::Clamp(TargetValue, MinimumValue, MaximumValue);
-	}
-
 	float CurrentValue = Weight == 1.0f? TargetValue : Model->GetParameterValue(Index) * (1.0f - Weight) + TargetValue * Weight;
 
-	Value = (CurrentValue - MinimumValue) / (MaximumValue - MinimumValue);
+	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
+	{
+		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
+	}
+
+	Value = CurrentValue;
 
 	Model->SetParameterValue(Index, CurrentValue);
 }
@@ -85,7 +79,7 @@ void UCubismParameterComponent::AddParameterValue(float TargetValue, const float
 		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
 	}
 
-	Value = (CurrentValue - MinimumValue) / (MaximumValue - MinimumValue);
+	Value = CurrentValue;
 
 	Model->SetParameterValue(Index, CurrentValue);
 }
@@ -99,7 +93,7 @@ void UCubismParameterComponent::MultiplyParameterValue(float TargetValue, const 
 		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
 	}
 
-	Value = (CurrentValue - MinimumValue) / (MaximumValue - MinimumValue);
+	Value = CurrentValue;
 
 	Model->SetParameterValue(Index, CurrentValue);
 }
@@ -123,9 +117,7 @@ void UCubismParameterComponent::PostEditChangeProperty(FPropertyChangedEvent& Pr
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismParameterComponent, Value))
 	{
-		const float CurrentValue = (MaximumValue - MinimumValue) * Value + MinimumValue;
-
-		Model->SetParameterValue(Index, CurrentValue);
+		Model->SetParameterValue(Index, Value);
 
 		if(Model->ParameterStore)
 		{

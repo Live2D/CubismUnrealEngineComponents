@@ -34,10 +34,16 @@ void UCubismExpressionComponent::Setup(UCubismModelComponent* InModel)
 	Time = 0.0f;
 	ExpressionQueue.Empty();
 
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	AddTickPrerequisiteComponent(Model->Pose); // must be updated at first because poses overwrite parameters
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
+	if (Model->Expression != this)
+	{
+		if (Model->Expression)
+		{
+			Model->Expression->DestroyComponent();
+		}
+		Model->Expression = this;
+	}
+
+	Model->AddTickPrerequisiteComponent(this); // model ticks after parameters are updated by components
 }
 
 void UCubismExpressionComponent::PlayExpression(const int32 InIndex)
@@ -197,7 +203,7 @@ void UCubismExpressionComponent::UpdateExpression(const int32 ExpressionIndex, c
 				ParameterValue.Id = Id;
 				ParameterValue.AdditiveValue = 0.0f;
 				ParameterValue.MultiplyValue = 1.0f;
-				ParameterValue.OverwriteValue = Parameter->GetParameterValue();
+				ParameterValue.OverwriteValue = Parameter->Value;
 
 				ParameterValues.Add(ParameterValue);
 			}
@@ -221,7 +227,7 @@ void UCubismExpressionComponent::UpdateExpression(const int32 ExpressionIndex, c
 
 		float NewAdditiveValue = 0.0f;
 		float NewMultiplyValue = 1.0f;
-		float NewOverwriteValue = Model->GetParameter(ParameterValue.Id)->GetParameterValue();
+		float NewOverwriteValue = Model->GetParameter(ParameterValue.Id)->Value;
 
 		const FCubismExpressionParameter& Parameter = Expression->Parameters[ParameterValue.Index];
 		int32 ParameterIndex = -1;

@@ -16,7 +16,6 @@ UCubismPartComponent::UCubismPartComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
 	bTickInEditor = true;
-	CreationMethod = EComponentCreationMethod::Instance;
 }
 
 void UCubismPartComponent::Setup(UCubismModelComponent* InModel)

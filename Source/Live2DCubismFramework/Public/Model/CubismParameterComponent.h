@@ -59,7 +59,7 @@ public:
 	/**
 	 * The value of the parameter.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism", meta = (ClampMin = "0.0", ClampMax = "1.0", SliderMin = "0.0", SliderMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	float Value;
 
 public:
@@ -70,13 +70,6 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
 	void Setup(UCubismModelComponent* InModel);
-
-	/**
-	 * @brief The function to get the value of the parameter.
-	 * @return The value of the parameter.
-	 */
-	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
-	float GetParameterValue() const;
 
 	/**
 	 * @brief The function to set the value of the parameter.

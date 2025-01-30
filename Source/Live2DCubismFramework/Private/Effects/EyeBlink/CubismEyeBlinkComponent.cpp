@@ -40,10 +40,16 @@ void UCubismEyeBlinkComponent::Setup(UCubismModelComponent* InModel)
 		Ids.Append(Json->EyeBlinks);
 	}
 
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	AddTickPrerequisiteComponent(Model->Pose); // must be updated at first because poses overwrite parameters
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
+	if (Model->EyeBlink != this)
+	{
+		if (Model->EyeBlink)
+		{
+			Model->EyeBlink->DestroyComponent();
+		}
+		Model->EyeBlink = this;
+	}
+
+	Model->AddTickPrerequisiteComponent(this); // model ticks after parameters are updated by components
 }
 
 // UObject interface

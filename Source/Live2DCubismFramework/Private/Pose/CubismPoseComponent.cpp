@@ -13,6 +13,8 @@
 #include "Model/CubismPartComponent.h"
 #include "Model/CubismModelActor.h"
 #include "Model/CubismModelComponent.h"
+#include "Model/CubismParameterStoreComponent.h"
+#include "Motion/CubismMotionComponent.h"
 #include "Pose/CubismPose3Json.h"
 
 const float Epsilon = 0.001f;
@@ -24,7 +26,7 @@ const float BackOpacityThreshold = 0.15f;
 UCubismPoseComponent::UCubismPoseComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
@@ -76,11 +78,17 @@ void UCubismPoseComponent::Setup(UCubismModelComponent* InModel)
 		}
 	}
 
-	Model->Pose = this;
+	if (Model->Pose != this)
+	{
+		if (Model->Pose)
+		{
+			Model->Pose->DestroyComponent();
+		}
+		Model->Pose = this;
+	}
 
 	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
 	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
 }
 
 // UObject interface

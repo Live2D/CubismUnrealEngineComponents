@@ -32,10 +32,16 @@ void UCubismLookAtComponent::Setup(UCubismModelComponent* InModel)
 	LastPosition = FVector::ZeroVector;
 	CurrentVelocity = FVector::ZeroVector;
 
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	AddTickPrerequisiteComponent(Model->Pose); // must be updated at first because poses overwrite parameters
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
+	if (Model->LookAt != this)
+	{
+		if (Model->LookAt)
+		{
+			Model->LookAt->DestroyComponent();
+		}
+		Model->LookAt = this;
+	}
+
+	Model->AddTickPrerequisiteComponent(this); // model ticks after parameters are updated by components
 }
 
 // UObject interface

@@ -28,35 +28,7 @@ public:
 		ENQUEUE_RENDER_COMMAND(InitCubismDrawableSceneProxy)(
 			[this](FRHICommandListImmediate& RHICmdList)
 			{
-				if (!VertexBuffer)
-				{
-					VertexBuffer = new FCubismDrawableVertexBuffer(DynamicData);
-					#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-					VertexBuffer->InitResource(RHICmdList);
-					#else
-					VertexBuffer->InitResource();
-					#endif
-				}
-
-				if (!IndexBuffer)
-				{
-					IndexBuffer = new FCubismDrawableIndexBuffer(DynamicData);
-					#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-					IndexBuffer->InitResource(RHICmdList);
-					#else
-					IndexBuffer->InitResource();
-					#endif
-				}
-
-				if (!VertexFactory)
-				{
-					VertexFactory = new FCubismDrawableVertexFactory(GetScene().GetFeatureLevel(), VertexBuffer);
-					#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-					VertexFactory->InitResource(RHICmdList);
-					#else
-					VertexFactory->InitResource();
-					#endif
-				}
+				UpdateDynamicData(RHICmdList, DynamicData);
 			}
 		);
 	}
@@ -93,7 +65,7 @@ public:
 		FMeshElementCollector& Collector
 	) const override
 	{
-		if (DynamicData.Positions.Num() == 0)
+		if (DynamicData.Positions.Num() == 0 || DynamicData.UVs.Num() == 0 || DynamicData.Indices.Num() == 0)
 		{
 			return;
 		}
@@ -169,16 +141,52 @@ public:
 
 	virtual uint32 GetMemoryFootprint(void) const override { return(sizeof(*this) + GetAllocatedSize()); }
 
-	void UpdateDynamicData(const FCubismDrawableDynamicMeshData& NewDynamicData)
+	void UpdateDynamicData(FRHICommandListImmediate& RHICmdList, const FCubismDrawableDynamicMeshData& NewDynamicData)
 	{
 		DynamicData = NewDynamicData;
-		if (VertexBuffer)
+
+		if (DynamicData.Positions.Num() > 0 && DynamicData.UVs.Num() > 0)
 		{
-			VertexBuffer->UpdateBuffer(DynamicData.Positions, DynamicData.UVs);
+			if (VertexBuffer)
+			{
+				VertexBuffer->UpdateBuffer(DynamicData.Positions, DynamicData.UVs);
+			}
+			else
+			{
+				VertexBuffer = new FCubismDrawableVertexBuffer(DynamicData);
+				#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+				VertexBuffer->InitResource(RHICmdList);
+				#else
+				VertexBuffer->InitResource();
+				#endif
+			}
 		}
-		if (IndexBuffer)
+
+		if (DynamicData.Indices.Num() > 0)
 		{
-			IndexBuffer->UpdateBuffer(DynamicData.Indices);
+			if (IndexBuffer)
+			{
+				IndexBuffer->UpdateBuffer(DynamicData.Indices);
+			}
+			else
+			{
+				IndexBuffer = new FCubismDrawableIndexBuffer(DynamicData);
+				#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+				IndexBuffer->InitResource(RHICmdList);
+				#else
+				IndexBuffer->InitResource();
+				#endif
+			}
+		}
+
+		if (!VertexFactory && VertexBuffer)
+		{
+			VertexFactory = new FCubismDrawableVertexFactory(GetScene().GetFeatureLevel(), VertexBuffer);
+			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+			VertexFactory->InitResource(RHICmdList);
+			#else
+			VertexFactory->InitResource();
+			#endif
 		}
 	}
 

@@ -48,13 +48,20 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismMotionCurve
 	 * The property corresponding to the `FadeInTime` field in a curve object.
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Curve")
-	float FadeInTime = -1.0f;
+	float FadeInTime;
 
 	/**
 	 * The property corresponding to the `FadeOutTime` field in a curve object.
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Curve")
-	float FadeOutTime = -1.0f;
+	float FadeOutTime;
+
+	FCubismMotionCurve()
+		: Id()
+		, Target(ECubismMotionCurveTarget::None)
+		, FadeInTime(-1.0f)
+		, FadeOutTime(-1.0f)
+	{ }
 };
 
 /**
@@ -76,6 +83,11 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismMotionEvent
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Event")
 	FString Value;
+
+	FCubismMotionEvent()
+		: Time(0.0f)
+		, Value()
+	{ }
 };
 
 /**
@@ -136,13 +148,16 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Motion Data")
 	TArray<FCubismMotionEvent> Events;
 
+	// UObject interface
+	virtual void PostInitProperties() override;
+	// End of UObject interface
+
 #if WITH_EDITORONLY_DATA
 	// Import data for this 
 	UPROPERTY(VisibleAnywhere, Instanced, Category=ImportSettings)
 	TObjectPtr<class UAssetImportData> AssetImportData;
 
 	// UObject interface
-	virtual void PostInitProperties() override;
 	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
 	virtual void Serialize(FArchive& Ar) override;
 	// End of UObject interface
@@ -168,4 +183,9 @@ struct LIVE2DCUBISMFRAMEWORK_API FMotion3JsonGroup
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Motion Group")
 	TArray<TObjectPtr<UCubismMotion3Json>> Motion3Jsons;
+
+	FMotion3JsonGroup()
+		: Name()
+		, Motion3Jsons()
+	{ }
 };

@@ -43,6 +43,10 @@ public class Live2DCubismFrameworkEditor : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"UnrealEd",
+				"Slate",
+				"SlateCore",
+				"ToolMenus",
+				"InputCore",
 				"Live2DCubismFramework",
 				// ... add private dependencies that you statically link with here ...	
 			}

@@ -29,10 +29,16 @@ void UCubismHarmonicMotionComponent::Setup(UCubismModelComponent* InModel)
 		Model = InModel;
 	}
 
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	AddTickPrerequisiteComponent(Model->Pose); // must be updated at first because poses overwrite parameters
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
+	if (Model->HarmonicMotion != this)
+	{
+		if (Model->HarmonicMotion)
+		{
+			Model->HarmonicMotion->DestroyComponent();
+		}
+		Model->HarmonicMotion = this;
+	}
+
+	Model->AddTickPrerequisiteComponent(this); // model ticks after parameters are updated by components
 }
 
 // UObject interface

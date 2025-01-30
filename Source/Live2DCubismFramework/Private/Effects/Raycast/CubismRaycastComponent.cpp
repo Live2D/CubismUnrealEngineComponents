@@ -42,11 +42,6 @@ void UCubismRaycastComponent::Setup(UCubismModelComponent* InModel)
 			Parameters.Add(Parameter);
 		}
 	}
-
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	AddTickPrerequisiteComponent(Model->Pose); // must be updated at first because poses overwrite parameters
-	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
 }
 
 void UCubismRaycastComponent::Raycast(

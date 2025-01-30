@@ -11,9 +11,9 @@
 #include "Model/CubismMoc3.h"
 #include "Model/CubismDrawableComponent.h"
 #include "Model/CubismParameterComponent.h"
-#include "Model/CubismParameterStoreComponent.h"
 #include "Model/CubismPartComponent.h"
-#include "Rendering/CubismRendererComponent.h"
+#include "UserData/CubismUserData3Json.h"
+
 #include "CubismLog.h"
 
 UCubismModelComponent::UCubismModelComponent()
@@ -47,8 +47,6 @@ void UCubismModelComponent::Setup()
 	{
 		Part->Setup(this);
 	}
-
-	AddTickPrerequisiteComponent(ParameterStore); // must be updated after parameters loaded
 }
 
 ////
@@ -521,6 +519,44 @@ void UCubismModelComponent::PostLoad()
 
 	Setup();
 }
+
+#if WITH_EDITOR
+void UCubismModelComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
+
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismModelComponent, UserDataJson))
+	{
+		if (!UserDataJson)
+		{
+			for (const TObjectPtr<UCubismDrawableComponent>& Drawable : Drawables)
+			{
+				Drawable->UserDataTag = TEXT("");
+			}
+		}
+		else
+		{
+			const FCubismUserDataEntry& UserDataEntry = UserDataJson->Data[ECubismUserDataTargetType::ArtMesh];
+
+			for (const TObjectPtr<UCubismDrawableComponent>& Drawable : Drawables)
+			{
+				const FString Id = Drawable->Id;
+
+				if (UserDataEntry.Tags.Contains(Id))
+				{
+					Drawable->UserDataTag = UserDataEntry.Tags[Id];
+				}
+				else
+				{
+					Drawable->UserDataTag = TEXT("");
+				}
+			}
+		}
+	}
+}
+#endif
 // End of UObject interface
 
 // UActorComponent interface
@@ -598,19 +634,16 @@ void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 	{
 		Drawable->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
 		GetOwner()->RemoveInstanceComponent(Drawable);
-		Drawable->UnregisterComponent();
 		Drawable->DestroyComponent();
 	}
 
 	for (const TObjectPtr<UCubismParameterComponent>& Parameter : Parameters)
 	{
-		Parameter->UnregisterComponent();
 		Parameter->DestroyComponent();
 	}
 
 	for (const TObjectPtr<UCubismPartComponent>& Part : Parts)
 	{
-		Part->UnregisterComponent();
 		Part->DestroyComponent();
 	}
 

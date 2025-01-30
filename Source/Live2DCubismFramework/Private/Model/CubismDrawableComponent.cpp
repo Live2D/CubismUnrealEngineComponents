@@ -11,6 +11,7 @@
 #include "Model/CubismModelActor.h"
 #include "Model/CubismModelComponent.h"
 #include "Rendering/CubismDrawableSceneProxy.h"
+#include "UserData/CubismUserData3Json.h"
 #include "CubismLog.h"
 #include "Live2DCubismCore.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -130,6 +131,24 @@ void UCubismDrawableComponent::Setup(UCubismModelComponent* InModel)
 	UMaterialInstanceDynamic* MaterialInstance = UMaterialInstanceDynamic::Create(Material, this, *MaterialName);
 
 	SetMaterial(0, static_cast<UMaterialInterface*>(MaterialInstance));
+
+	if (!Model->UserDataJson)
+	{
+		UserDataTag = TEXT("");
+	}
+	else
+	{
+		const FCubismUserDataEntry& UserDataEntry = Model->UserDataJson->Data[ECubismUserDataTargetType::ArtMesh];
+
+		if (UserDataEntry.Tags.Contains(Id))
+		{
+			UserDataTag = UserDataEntry.Tags[Id];
+		}
+		else
+		{
+			UserDataTag = TEXT("");
+		}
+	}
 
 	AddTickPrerequisiteComponent(Model); // must be updated after model updated
 }
@@ -279,9 +298,9 @@ void UCubismDrawableComponent::SendRenderDynamicData_Concurrent()
 		NewDynamicData.bTwoSided = bTwoSided;
 
 		ENQUEUE_RENDER_COMMAND(DrawableUpdateDynamicData)(
-			[DrawableProxy, NewDynamicData](FRHICommandListImmediate& RHICommandList)
+			[DrawableProxy, NewDynamicData](FRHICommandListImmediate& RHICmdList)
 			{
-				DrawableProxy->UpdateDynamicData(NewDynamicData);
+				DrawableProxy->UpdateDynamicData(RHICmdList, NewDynamicData);
 			}
 		);
 	}

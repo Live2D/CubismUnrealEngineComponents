@@ -54,9 +54,15 @@ void UCubismLipSyncComponent::Setup(UCubismModelComponent* InModel)
 		Audio = CreateAudioComponent();
 	}
 
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
-	AddTickPrerequisiteComponent(Model->Pose); // must be updated at first because poses overwrite parameters
+	if (Model->LipSync != this)
+	{
+		if (Model->LipSync)
+		{
+			Model->LipSync->DestroyComponent();
+		}
+		Model->LipSync = this;
+	}
+
 	Model->AddTickPrerequisiteComponent(this); // must update parameters on memory after parameter updated
 }
 
@@ -72,11 +78,11 @@ void UCubismLipSyncComponent::OnEnvelopeValue(const USoundWave* InSoundWave, con
 
 TObjectPtr<UAudioComponent> UCubismLipSyncComponent::CreateAudioComponent()
 {
-	TObjectPtr<UAudioComponent> NewAudio = NewObject<UAudioComponent>(this, NAME_None, RF_Transactional | RF_Transient);
+	TObjectPtr<UAudioComponent> NewAudio = NewObject<UAudioComponent>(Model, NAME_None, RF_Transactional | RF_Transient);
 
 	NewAudio->OnAudioSingleEnvelopeValue.AddUniqueDynamic(this, &UCubismLipSyncComponent::OnEnvelopeValue);
 
-	if (!NewAudio->GetAttachParent() && !NewAudio->IsAttachedTo(this))
+	if (!NewAudio->GetAttachParent() && !NewAudio->IsAttachedTo(Model))
 	{
 		AActor* Owner = GetOwner();
 
@@ -85,16 +91,16 @@ TObjectPtr<UAudioComponent> UCubismLipSyncComponent::CreateAudioComponent()
 			if (UWorld* World = GetWorld())
 			{
 				NewAudio->RegisterComponentWithWorld(World);
-				NewAudio->AttachToComponent(this, FAttachmentTransformRules::KeepRelativeTransform);
+				NewAudio->AttachToComponent(Model, FAttachmentTransformRules::KeepRelativeTransform);
 			}
 			else
 			{
-				NewAudio->SetupAttachment(this);
+				NewAudio->SetupAttachment(Model);
 			}
 		}
 		else
 		{
-			NewAudio->AttachToComponent(this, FAttachmentTransformRules::KeepRelativeTransform);
+			NewAudio->AttachToComponent(Model, FAttachmentTransformRules::KeepRelativeTransform);
 			NewAudio->RegisterComponent();
 		}
 	}
@@ -207,7 +213,6 @@ void UCubismLipSyncComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 		if (Owner && Owner->GetWorld())
 		{
 			Audio->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
-			Audio->UnregisterComponent();
 		}
 		Audio->DestroyComponent();
 		Audio = nullptr;

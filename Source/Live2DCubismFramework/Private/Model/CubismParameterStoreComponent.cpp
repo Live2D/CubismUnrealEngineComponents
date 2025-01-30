@@ -15,7 +15,7 @@
 UCubismParameterStoreComponent::UCubismParameterStoreComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
@@ -34,12 +34,19 @@ void UCubismParameterStoreComponent::Setup(UCubismModelComponent* InModel)
 
 	SaveParameters();
 
-	Model->ParameterStore = this;
+	if (Model->ParameterStore != this)
+	{
+		if (Model->ParameterStore)
+		{
+			Model->ParameterStore->DestroyComponent();
+		}
+		Model->ParameterStore = this;
+	}
 }
 
 void UCubismParameterStoreComponent::SaveParameterValue(const int32 ParameterIndex)
 {
-	ParameterValues.Add(ParameterIndex, Model->GetParameter(ParameterIndex)->GetParameterValue());
+	ParameterValues.Add(ParameterIndex, Model->GetParameter(ParameterIndex)->Value);
 }
 
 void UCubismParameterStoreComponent::SavePartOpacity(const int32 PartIndex)
@@ -53,11 +60,11 @@ void UCubismParameterStoreComponent::SaveParameters()
 	{
 		if (ParameterValues.Contains(Parameter->Index))
 		{
-			ParameterValues[Parameter->Index] = Parameter->GetParameterValue();
+			ParameterValues[Parameter->Index] = Parameter->Value;
 		}
 		else
 		{
-			ParameterValues.Add(Parameter->Index, Parameter->GetParameterValue());
+			ParameterValues.Add(Parameter->Index, Parameter->Value);
 		}
 	}
 
@@ -84,7 +91,7 @@ void UCubismParameterStoreComponent::LoadParameters()
 		}
 		else
 		{
-			ParameterValues.Add(Parameter->Index, Parameter->GetParameterValue());
+			ParameterValues.Add(Parameter->Index, Parameter->Value);
 		}
 	}
 

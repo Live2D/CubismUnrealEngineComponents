@@ -8,18 +8,26 @@
 
 #pragma once
 
-#include "Model/CubismParameterStoreComponent.h"
-#include "Pose/CubismPoseComponent.h"
-#include "Motion/CubismMotionComponent.h"
 #include "Live2DCubismCore.h"
 
 #include "CubismModelComponent.generated.h"
 
 class UCubismMoc3;
+class UCubismDisplayInfo3Json;
+class UCubismUserData3Json;
 class UCubismDrawableComponent;
 class UCubismParameterComponent;
 class UCubismPartComponent;
 class UCubismRendererComponent;
+class UCubismParameterStoreComponent;
+class UCubismMotionComponent;
+class UCubismExpressionComponent;
+class UCubismPhysicsComponent;
+class UCubismPoseComponent;
+class UCubismEyeBlinkComponent;
+class UCubismHarmonicMotionComponent;
+class UCubismLipSyncComponent;
+class UCubismLookAtComponent;
 
 /**
  * An enumeration for the blend mode of a drawable.
@@ -77,13 +85,13 @@ public:
 	/**
 	 * The list of parameter components that consist of the model.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Live2D Cubism")
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
 	TArray<TObjectPtr<UCubismParameterComponent>> Parameters;
 
 	/**
 	 * The list of part components that consist of the model.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Live2D Cubism")
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
 	TArray<TObjectPtr<UCubismPartComponent>> Parts;
 
 	/**
@@ -105,16 +113,64 @@ public:
 	TObjectPtr<UCubismMotionComponent> Motion;
 
 	/**
+	 * The component that controls the expression.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
+	TObjectPtr<UCubismExpressionComponent> Expression;
+
+	/**
+	 * The component that controls the physics.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
+	TObjectPtr<UCubismPhysicsComponent> Physics;
+
+	/**
 	 * The component that controls the pose.
 	 */
 	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
 	TObjectPtr<UCubismPoseComponent> Pose;
 
 	/**
+	 * The component that controls the eye blink.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
+	TObjectPtr<UCubismEyeBlinkComponent> EyeBlink;
+
+	/**
+	 * The component that controls the harmonic motion.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
+	TObjectPtr<UCubismHarmonicMotionComponent> HarmonicMotion;
+
+	/**
+	 * The component that controls the lip sync.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
+	TObjectPtr<UCubismLipSyncComponent> LipSync;
+
+	/**
+	 * The component that controls the look at.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
+	TObjectPtr<UCubismLookAtComponent> LookAt;
+
+	/**
 	 * The list of textures that the model uses.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Texture")
 	TArray<TObjectPtr<UTexture2D>> Textures;
+
+	/**
+	 * The json asset that contains the display info.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	TObjectPtr<UCubismDisplayInfo3Json> DisplayInfoJson;
+
+	/**
+	 * The json asset that contains the user data.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	TObjectPtr<UCubismUserData3Json> UserDataJson;
 
 	/**
 	 * The opacity of the model.
@@ -634,6 +690,10 @@ private:
 public:
 	// UObject interface
 	virtual void PostLoad() override;
+
+#if WITH_EDITORONLY_DATA
+	void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 	// End of UObject interface
 
 	// UActorComponent interface

@@ -40,6 +40,12 @@ struct FCubismPhysicsNormalization
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Normalization")
 	float Default;
+
+	FCubismPhysicsNormalization()
+		: Minimum(0.0f)
+		, Maximum(0.0f)
+		, Default(0.0f)
+	{ }
 };
 
 /**
@@ -81,6 +87,11 @@ struct FCubismPhysicsParameter
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Parameter")
 	ECubismPhysicsTargetType Target;
+
+	FCubismPhysicsParameter()
+		: Id()
+		, Target(ECubismPhysicsTargetType::Parameter)
+	{ }
 };
 
 /**
@@ -114,6 +125,13 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismPhysicsInput
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Input")
 	FCubismPhysicsParameter Source;
+
+	FCubismPhysicsInput()
+		: Weight(0.0f)
+		, bReflect(false)
+		, Type(ECubismPhysicsSource::X)
+		, Source()
+	{ }
 };
 
 /**
@@ -159,6 +177,15 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismPhysicsOutput
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Output")
 	FCubismPhysicsParameter Destination;
+
+	FCubismPhysicsOutput()
+		: VertexIndex(0)
+		, AngleScale(0.0f)
+		, Weight(0.0f)
+		, bReflect(false)
+		, Type(ECubismPhysicsSource::X)
+		, Destination()
+	{ }
 };
 
 /**
@@ -198,6 +225,14 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismPhysicsParticle
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Particle")
 	FVector2D Position;
+
+	FCubismPhysicsParticle()
+		: Mobility(0.0f)
+		, Delay(0.0f)
+		, Acceleration(0.0f)
+		, Radius(0.0f)
+		, Position(FVector2D::ZeroVector)
+	{ }
 };
 
 /**
@@ -251,6 +286,16 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismPhysicsSetting
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Setting")
 	FCubismPhysicsNormalization NormalizationAngle;
+
+	FCubismPhysicsSetting()
+		: Id()
+		, Name()
+		, Inputs()
+		, Outputs()
+		, Particles()
+		, NormalizationPosition()
+		, NormalizationAngle()
+	{ }
 };
 
 /**
@@ -317,13 +362,16 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Physics Data")
 	TArray<FCubismPhysicsSetting> PhysicsSettings;
 
+	// UObject interface
+	virtual void PostInitProperties() override;
+	// End of UObject interface
+
 #if WITH_EDITORONLY_DATA
 	// Import data for this 
 	UPROPERTY(VisibleAnywhere, Instanced, Category=ImportSettings)
 	TObjectPtr<class UAssetImportData> AssetImportData;
 
 	// UObject interface
-	virtual void PostInitProperties() override;
 	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
 	virtual void Serialize(FArchive& Ar) override;
 	// End of UObject interface

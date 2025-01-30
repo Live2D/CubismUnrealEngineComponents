@@ -17,8 +17,8 @@
 #include "Expression/CubismExpressionComponent.h"
 #include "Motion/CubismMotionComponent.h"
 #include "Model/CubismModelComponent.h"
+#include "Model/CubismParameterStoreComponent.h"
 #include "Rendering/CubismRendererComponent.h"
-#include "UserData/CubismUserDataComponent.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "ObjectTools.h"
 #include "PackageTools.h"
@@ -60,6 +60,20 @@ void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& Model
 		const TArray<TObjectPtr<UTexture2D>>& Textures = LoadTextures(Model3Json);
 		Model->Textures.Empty();
 		Model->Textures.Append(Textures);
+
+		// load displayinfo3.json
+		const TObjectPtr<UCubismDisplayInfo3Json>& DisplayInfo3Json = LoadDisplayInfo3Json(Model3Json);
+		if (DisplayInfo3Json != nullptr)
+		{
+			Model->DisplayInfoJson = DisplayInfo3Json;
+		}
+
+		// load userdata3.json
+		const TObjectPtr<UCubismUserData3Json>& UserData3Json = LoadUserData3Json(Model3Json);
+		if (UserData3Json != nullptr)
+		{
+			Model->UserDataJson = UserData3Json;
+		}
 
 		Model->RegisterComponent();
 		ModelActor->AddInstanceComponent(Model);
@@ -131,7 +145,6 @@ void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& Model
 
 		LipSync->Json = Model3Json;
 
-		LipSync->AttachToComponent(Model, FAttachmentTransformRules::KeepRelativeTransform);
 		LipSync->RegisterComponent();
 		ModelActor->AddInstanceComponent(LipSync);
 	}
@@ -164,18 +177,6 @@ void UCubismModelActorFactory::CreateModel(const TObjectPtr<ACubismModel>& Model
 
 		Renderer->RegisterComponent();
 		ModelActor->AddInstanceComponent(Renderer);
-	}
-
-	// load userdata3.json
-	const TObjectPtr<UCubismUserData3Json>& UserData3Json = LoadUserData3Json(Model3Json);
-	if (UserData3Json != nullptr)
-	{
-		UCubismUserDataComponent* UserData = NewObject<UCubismUserDataComponent>(Model, TEXT("CubismUserData"), RF_Transactional);
-
-		UserData->Json = UserData3Json;
-
-		UserData->RegisterComponent();
-		ModelActor->AddInstanceComponent(UserData);
 	}
 }
 
@@ -313,6 +314,22 @@ TArray<FMotion3JsonGroup> UCubismModelActorFactory::LoadMotion3Jsons(const TObje
 	}
 
 	return JsonGroups;
+}
+
+TObjectPtr<UCubismDisplayInfo3Json> UCubismModelActorFactory::LoadDisplayInfo3Json(const TObjectPtr<UCubismModel3Json>& Model3Json)
+{
+	if (Model3Json->DisplayInfoPath.IsEmpty())
+	{
+		return nullptr;
+	}
+
+	const FString& LongPackagePath = FPackageName::GetLongPackagePath(Model3Json->GetOutermost()->GetPathName());
+
+	const FString& AssetPath = GetAssetPath(LongPackagePath / Model3Json->DisplayInfoPath);
+
+	const TObjectPtr<UCubismDisplayInfo3Json>& Json = LoadObject<UCubismDisplayInfo3Json>(nullptr, *AssetPath);
+
+	return Json;
 }
 
 TObjectPtr<UCubismUserData3Json> UCubismModelActorFactory::LoadUserData3Json(const TObjectPtr<UCubismModel3Json>& Model3Json)

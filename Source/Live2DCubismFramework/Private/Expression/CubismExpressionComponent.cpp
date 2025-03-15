@@ -82,14 +82,28 @@ void UCubismExpressionComponent::StopAllExpressions(const bool bForce)
 	}
 }
 
+TObjectPtr<UCubismModelComponent> UCubismExpressionComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
+
 // UObject interface
 void UCubismExpressionComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 #if WITH_EDITOR
@@ -119,9 +133,12 @@ void UCubismExpressionComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 void UCubismExpressionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

@@ -119,14 +119,27 @@ TObjectPtr<UAudioComponent> UCubismLipSyncComponent::CreateAudioComponent()
 	return NewAudio;
 }
 
+TObjectPtr<UCubismModelComponent> UCubismLipSyncComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
 // UObject interface
 void UCubismLipSyncComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 #if WITH_EDITOR
@@ -199,9 +212,12 @@ void UCubismLipSyncComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 void UCubismLipSyncComponent::OnComponentDestroyed(bool bDestroyingHierarchy)

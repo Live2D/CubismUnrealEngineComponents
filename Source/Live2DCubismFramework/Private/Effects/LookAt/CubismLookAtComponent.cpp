@@ -44,14 +44,27 @@ void UCubismLookAtComponent::Setup(UCubismModelComponent* InModel)
 	Model->AddTickPrerequisiteComponent(this); // model ticks after parameters are updated by components
 }
 
+TObjectPtr<UCubismModelComponent> UCubismLookAtComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
 // UObject interface
 void UCubismLookAtComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 // End of UObject interface
 
@@ -60,9 +73,12 @@ void UCubismLookAtComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 void UCubismLookAtComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

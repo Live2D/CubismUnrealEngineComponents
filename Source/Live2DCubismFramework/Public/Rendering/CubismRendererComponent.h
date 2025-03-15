@@ -28,7 +28,7 @@ enum class ECubismRendererSortingOrder : uint8
 /**
  * A component to render Live2D Cubism models.
  */
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(Blueprintable)
 class LIVE2DCUBISMFRAMEWORK_API UCubismRendererComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -96,12 +96,19 @@ private:
 	 */
 	UCubismRendererComponent();
 
+	void SpawnMaskTexture();
+
+	TObjectPtr<UCubismModelComponent> GetModel();
+
 	/**
 	 * The model component that the component depends on.
 	 */
 	TObjectPtr<UCubismModelComponent> Model;
 
 public:	
+
+	virtual void BeginPlay() override;
+
 	// UObject interface
 	virtual void PostLoad() override;
 

@@ -22,7 +22,7 @@ UCubismMaskTextureComponent::UCubismMaskTextureComponent()
 	bTickInEditor = true;
 }
 
-void UCubismMaskTextureComponent::AddModel(ACubismModel* Model)
+void UCubismMaskTextureComponent::AddModel(AActor* Model)
 {
 	Models.AddUnique(Model);
 
@@ -37,7 +37,7 @@ void UCubismMaskTextureComponent::AddModel(ACubismModel* Model)
 	bDirty = true;
 }
 
-void UCubismMaskTextureComponent::RemoveModel(ACubismModel* Model)
+void UCubismMaskTextureComponent::RemoveModel(AActor* Model)
 {
 	Models.Remove(Model);
 
@@ -55,11 +55,18 @@ void UCubismMaskTextureComponent::RemoveModel(ACubismModel* Model)
 void UCubismMaskTextureComponent::ResolveMaskLayout()
 {
 	NumMasks = 0;
-	for (const TObjectPtr<ACubismModel>& ModelActor : Models)
+	for (const TObjectPtr<AActor>& ModelActor : Models)
 	{
+		const TObjectPtr<UCubismModelComponent> ModelComp = GetModel(ModelActor);
+
+		if (!ModelComp)
+		{
+			continue;
+		}
+
 		if (IsValid(ModelActor))
 		{
-			NumMasks += ModelActor->Model->Renderer->NumMasks;
+			NumMasks += ModelComp->Renderer->NumMasks;
 		}
 	}
 
@@ -74,14 +81,20 @@ void UCubismMaskTextureComponent::ResolveMaskLayout()
 	AllocateRenderTargets(RenderTargetCount);
 
 	int32 Index = 0;
-	for (const TObjectPtr<ACubismModel>& ModelActor : Models)
+	for (const TObjectPtr<AActor>& ModelActor : Models)
 	{
 		if (!IsValid(ModelActor))
 		{
 			continue;
 		}
+		const TObjectPtr<UCubismModelComponent> ModelComp = GetModel(ModelActor);
 
-		for (const TSharedPtr<FCubismMaskJunction>& Junction : ModelActor->Model->Renderer->Junctions)
+		if (!ModelComp)
+		{
+			continue;
+		}
+
+		for (const TSharedPtr<FCubismMaskJunction>& Junction : ModelComp->Renderer->Junctions)
 		{
 			if (Junction->MaskDrawables.Num() == 0)
 			{
@@ -122,7 +135,7 @@ void UCubismMaskTextureComponent::ResolveMaskLayout()
 				2.0f * Column + 1.0f,
 				2.0f *    Row + 1.0f,
 				0.5f / Resolution,
-				100.0f / ModelActor->Model->GetPixelsPerUnit()
+				100.0f / ModelComp->GetPixelsPerUnit()
 			);
 
 			if (Channel%4 == 0)
@@ -173,6 +186,16 @@ void UCubismMaskTextureComponent::AllocateRenderTargets(const int32 RequiredRTs)
 			RenderTargets.Pop()->MarkAsGarbage();
 		}
 	}
+}
+
+TObjectPtr<UCubismModelComponent> UCubismMaskTextureComponent::GetModel(AActor* Model) 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(Model->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
 }
 
 // UObject interface
@@ -243,16 +266,22 @@ void UCubismMaskTextureComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 		TArray<FMaskDrawInfo> MaskDrawInfos;
 
-		for (const TObjectPtr<ACubismModel>& ModelActor : Models)
+		for (const TObjectPtr<AActor>& ModelActor : Models)
 		{
 			if (!IsValid(ModelActor))
 			{
 				continue;
 			}
+			const TObjectPtr<UCubismModelComponent> ModelComp = GetModel(ModelActor);
 
-			const TArray<TObjectPtr<UTexture2D>>& Textures = ModelActor->Model->Textures;
+			if (!ModelComp)
+			{
+				continue;
+			}
 
-			for (const TSharedPtr<FCubismMaskJunction>& Junction : ModelActor->Model->Renderer->Junctions)
+			const TArray<TObjectPtr<UTexture2D>>& Textures = ModelComp->Textures;
+
+			for (const TSharedPtr<FCubismMaskJunction>& Junction : ModelComp->Renderer->Junctions)
 			{
 				// If the render target does not match, skip drawing the mask.
 				if (Junction->RenderTarget != RenderTarget)

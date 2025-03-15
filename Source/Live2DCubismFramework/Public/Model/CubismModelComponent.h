@@ -28,6 +28,10 @@ class UCubismEyeBlinkComponent;
 class UCubismHarmonicMotionComponent;
 class UCubismLipSyncComponent;
 class UCubismLookAtComponent;
+class UCubismPose3Json;
+class UCubismMotion3Json;
+class UCubismExp3Json;
+class UCubismPhysics3Json;
 
 /**
  * An enumeration for the blend mode of a drawable.
@@ -64,17 +68,30 @@ enum class ECubismParameterType : uint8
 /**
  * A component to control a Live2D Cubism model.
  */
-UCLASS(Blueprintable)
+UCLASS(Blueprintable, meta = (BlueprintSpawnableComponent))
 class LIVE2DCUBISMFRAMEWORK_API UCubismModelComponent : public USceneComponent
 {
 	GENERATED_BODY()
 
 public:
+
 	/**
 	 * The moc asset that contains the model information.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Live2D Cubism")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	TObjectPtr<UCubismMoc3> Moc;
+
+	/**
+ * The pose asset that contains the pose information.
+ */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	TObjectPtr<UCubismPose3Json> PoseJson;
+
+	/**
+* The pose asset that contains the motion information.
+*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	TArray<TObjectPtr<UCubismMotion3Json>> MotionJsons;
 
 	/**
 	 * The list of drawable components that consist of the model.
@@ -171,6 +188,18 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	TObjectPtr<UCubismUserData3Json> UserDataJson;
+
+	/**
+* The json assets that contain the expression information.
+*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	TArray<TObjectPtr<UCubismExp3Json>> ExpressionJsons;
+
+	/**
+* The json assets that contain the physics information.
+*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	TObjectPtr<UCubismPhysics3Json> PhysicsJson;
 
 	/**
 	 * The opacity of the model.
@@ -357,7 +386,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
 	UCubismPartComponent* GetPart(const FString PartId);
 
-private:
+public:
 	/**
 	 * @brief The constructor of the component.
 	 */
@@ -540,6 +569,7 @@ private:
 	 */
 	int32 GetDrawableParentPartIndex(const int32 DrawableIndex) const;
 
+	public:
 	/**
 	 * The map from the ID of a drawable to its index.
 	 */
@@ -612,11 +642,14 @@ private:
 	 */
 	void AddParameter(const FString ParameterId);
 
+	public:
 	/**
 	 * The map from the ID of a parameter to its index.
 	 */
 	UPROPERTY()
 	TMap<FString, int32> ParameterIndices;
+
+	private:
 
 	/**
 	 * The list of the IDs of the parameters that are not in the original model.
@@ -661,11 +694,15 @@ private:
 	 */
 	void AddPart(const FString PartId);
 
+	public:
+
 	/**
 	 * The map from the ID of a part to its index.
 	 */
 	UPROPERTY()
 	TMap<FString, int32> PartIndices;
+
+	private:
 
 	/**
 	 * The list of the IDs of the parts that are not in the original model.
@@ -681,6 +718,8 @@ private:
 
 private:
 	friend class UCubismMoc3;
+
+	public:
 
 	/**
 	 * The raw model data.
@@ -699,6 +738,10 @@ public:
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+	void ComponentCleanup();
+
+	void ComponentSetup();
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

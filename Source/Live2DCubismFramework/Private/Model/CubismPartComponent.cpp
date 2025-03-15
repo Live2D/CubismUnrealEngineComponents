@@ -51,14 +51,27 @@ void UCubismPartComponent::SetPartOpacity(float TargetOpacity)
 	Model->SetPartOpacity(Index, Opacity);
 }
 
+TObjectPtr<UCubismModelComponent> UCubismPartComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
 // UObject interface
 void UCubismPartComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 #if WITH_EDITOR
@@ -86,8 +99,11 @@ void UCubismPartComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 // End of UActorComponent interface

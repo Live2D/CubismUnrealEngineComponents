@@ -187,14 +187,27 @@ int32 UCubismDrawableComponent::GetDrawableMaskCount() const
 	return Model->GetDrawableMaskCount(Index);
 }
 
+TObjectPtr<UCubismModelComponent> UCubismDrawableComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
 // UObject interface
 void UCubismDrawableComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 #if WITH_EDITOR
@@ -269,9 +282,12 @@ void UCubismDrawableComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 void UCubismDrawableComponent::SendRenderDynamicData_Concurrent()

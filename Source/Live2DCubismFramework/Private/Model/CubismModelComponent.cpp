@@ -13,6 +13,12 @@
 #include "Model/CubismParameterComponent.h"
 #include "Model/CubismPartComponent.h"
 #include "UserData/CubismUserData3Json.h"
+#include "Model/CubismParameterStoreComponent.h"
+#include "Rendering/CubismRendererComponent.h"
+#include "Pose/CubismPoseComponent.h"
+#include "Motion/CubismMotionComponent.h"
+#include "Expression/CubismExpressionComponent.h"
+#include "Physics/CubismPhysicsComponent.h"
 
 #include "CubismLog.h"
 
@@ -29,6 +35,12 @@ UCubismModelComponent::~UCubismModelComponent()
 
 void UCubismModelComponent::Setup()
 {
+
+	if (!Moc)
+	{
+		return;
+	}
+
 	check(Moc);
 
 	Moc->SetupModel(this);
@@ -564,9 +576,20 @@ void UCubismModelComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
+	if (!Moc)
+	{
+		return;
+	}
+
 	check(Moc);
 
 	Moc->SetupModel(this);
+
+	//Need to ensure that the model is cleaned up before it can be created
+	if (NonNativeParameterIds.Num() > 0)
+	{
+		ComponentCleanup();
+	}
 
 	{
 		const int32 DrawableCount = csmGetDrawableCount(RawModel);
@@ -626,12 +649,97 @@ void UCubismModelComponent::OnComponentCreated()
 			Parts.Add(Part);
 		}
 	}
+
+	Setup();
+	ComponentSetup();
 }
 
-void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+void UCubismModelComponent::ComponentSetup()
+{
+	//Setting up the Store Component
+	if (!ParameterStore)
+	{
+		ParameterStore = NewObject<UCubismParameterStoreComponent>(this, UCubismParameterStoreComponent::StaticClass());
+		ParameterStore->RegisterComponent();
+	}
+	
+
+	//Setting up the renderer Component
+	if (!Renderer)
+	{
+		Renderer = NewObject<UCubismRendererComponent>(this, UCubismRendererComponent::StaticClass());
+		Renderer->RegisterComponent();
+	}
+	
+
+	//Setting up the pose component
+	if (!Pose)
+	{
+		Pose = NewObject<UCubismPoseComponent>(this, UCubismPoseComponent::StaticClass());
+		if (PoseJson)
+		{
+			Pose->Json = PoseJson;
+		}
+		Pose->RegisterComponent();
+	}
+
+
+	//Setting up the motion component
+	if (!Motion)
+	{
+		Motion = NewObject<UCubismMotionComponent>(this, UCubismMotionComponent::StaticClass());
+
+		if (MotionJsons.Num() > 0)
+		{
+			Motion->Jsons = MotionJsons;
+		}
+
+		Motion->RegisterComponent();
+
+		if (MotionJsons.Num() > 0)
+		{
+			if (MotionJsons[0])
+			{
+				Motion->PlayMotion(0, 0.0f, ECubismMotionPriority::Idle);
+			}
+		}
+	}
+
+	//Setting up the expression component
+	if (!Expression)
+	{
+		Expression = NewObject<UCubismExpressionComponent>(this, UCubismExpressionComponent::StaticClass());
+
+		if (ExpressionJsons.Num() > 0)
+		{
+			Expression->Jsons = ExpressionJsons;
+		}
+
+		Expression->RegisterComponent();
+	}
+
+	//Setting up the physics component
+	if (!Physics)
+	{
+		Physics = NewObject<UCubismPhysicsComponent>(this, UCubismPhysicsComponent::StaticClass());
+
+		if (PhysicsJson)
+		{
+			Physics->Json = PhysicsJson;
+		}
+
+		Physics->RegisterComponent();
+	}
+}
+
+void UCubismModelComponent::ComponentCleanup() 
 {
 	for (const TObjectPtr<UCubismDrawableComponent>& Drawable : Drawables)
 	{
+		if (!Drawable)
+		{
+			continue;
+		}
 		Drawable->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
 		GetOwner()->RemoveInstanceComponent(Drawable);
 		Drawable->DestroyComponent();
@@ -639,11 +747,19 @@ void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 
 	for (const TObjectPtr<UCubismParameterComponent>& Parameter : Parameters)
 	{
+		if (!Parameter)
+		{
+			continue;
+		}
 		Parameter->DestroyComponent();
 	}
 
 	for (const TObjectPtr<UCubismPartComponent>& Part : Parts)
 	{
+		if (!Part)
+		{
+			continue;
+		}
 		Part->DestroyComponent();
 	}
 
@@ -654,6 +770,12 @@ void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 	DrawableIndices.Empty();
 	ParameterIndices.Empty();
 	PartIndices.Empty();
+	NonNativeParameterIds.Empty();
+}
+
+void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+{
+	ComponentCleanup();
 
 	Moc->DeleteModel(this);
 

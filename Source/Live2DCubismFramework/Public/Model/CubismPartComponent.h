@@ -86,6 +86,8 @@ private:
 	 */
 	UCubismPartComponent();
 
+	TObjectPtr<UCubismModelComponent> GetModel();
+
 	/**
 	 * The model component that the component depends on.
 	 */

@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Model/CubismModelActor.h"
+#include "Model/CubismModelComponent.h"
 #include "Rendering/CubismShaders.h"
 
 #include "CubismMaskTextureComponent.generated.h"
@@ -62,7 +63,7 @@ public:
 	 * The list of ACubismModel instances whose masks are managed by the component.
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Live2D Cubism")
-	TArray<TObjectPtr<ACubismModel>> Models;
+	TArray<TObjectPtr<AActor>> Models;
 
 	/**
 	 * The list of render targets where the assigned masks are drawn.
@@ -75,14 +76,14 @@ public:
 	 * @param Model The model to add.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
-	void AddModel(ACubismModel* Model);
+	void AddModel(AActor* Model);
 
 	/**
 	 * @brief The function to remove a model from the component.
 	 * @param Model The model to remove.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
-	void RemoveModel(ACubismModel* Model);
+	void RemoveModel(AActor* Model);
 
 	/**
 	 * ResolveMaskLayout
@@ -97,6 +98,8 @@ private:
 	 * @brief The constructor of the component.
 	 */
 	UCubismMaskTextureComponent();
+
+	TObjectPtr<UCubismModelComponent> GetModel(AActor* Model);
 
 	/**
 	 * @brief The function to calculate the optimal level of detail under the current settings.

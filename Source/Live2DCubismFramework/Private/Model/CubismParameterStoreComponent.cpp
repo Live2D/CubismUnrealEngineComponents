@@ -85,6 +85,10 @@ void UCubismParameterStoreComponent::LoadParameters()
 {
 	for (const TObjectPtr<UCubismParameterComponent>& Parameter : Model->Parameters)
 	{
+		if (!Parameter)
+		{
+			continue;
+		}
 		if (ParameterValues.Contains(Parameter->Index))
 		{
 			Parameter->SetParameterValue(ParameterValues[Parameter->Index]);
@@ -97,6 +101,10 @@ void UCubismParameterStoreComponent::LoadParameters()
 
 	for (const TObjectPtr<UCubismPartComponent>& Part : Model->Parts)
 	{
+		if (!Part)
+		{
+			continue;
+		}
 		if (PartOpacities.Contains(Part->Index))
 		{
 			Part->SetPartOpacity(PartOpacities[Part->Index]);
@@ -108,14 +116,27 @@ void UCubismParameterStoreComponent::LoadParameters()
 	}
 }
 
+TObjectPtr<UCubismModelComponent> UCubismParameterStoreComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
 // UObject interface
 void UCubismParameterStoreComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 // End of UObject interface
 
@@ -124,17 +145,24 @@ void UCubismParameterStoreComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 void UCubismParameterStoreComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 {
-	if (Model->ParameterStore == this)
+	if (Model)
 	{
-		Model->ParameterStore = nullptr;
+		if (Model->ParameterStore == this)
+		{
+			Model->ParameterStore = nullptr;
+		}
 	}
+
 
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }

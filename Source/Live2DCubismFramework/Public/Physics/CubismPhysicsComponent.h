@@ -17,7 +17,7 @@ class UCubismModelComponent;
 /**
  * A component to apply the physics to the specified parameters of the Cubism model.
  */
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(Blueprintable)
 class LIVE2DCUBISMFRAMEWORK_API UCubismPhysicsComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -67,6 +67,8 @@ private:
 	 * @brief The constructor of the component.
 	 */
 	UCubismPhysicsComponent();
+
+	TObjectPtr<UCubismModelComponent> GetModel();
 
 	/**
 	 * @brief The model component that the component depends on.

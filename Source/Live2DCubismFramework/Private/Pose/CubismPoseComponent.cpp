@@ -91,14 +91,27 @@ void UCubismPoseComponent::Setup(UCubismModelComponent* InModel)
 	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
 }
 
+TObjectPtr<UCubismModelComponent> UCubismPoseComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
 // UObject interface
 void UCubismPoseComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 #if WITH_EDITOR
@@ -121,9 +134,12 @@ void UCubismPoseComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 void UCubismPoseComponent::DoFade(float DeltaTime)

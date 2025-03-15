@@ -202,6 +202,8 @@ private:
 	 */
 	UCubismDrawableComponent();
 
+	TObjectPtr<UCubismModelComponent> GetModel();
+
 	/**
 	 * The model component that the component depends on.
 	 */
@@ -260,6 +262,8 @@ private:
 	void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 	// End of UObject interface
+
+	
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;

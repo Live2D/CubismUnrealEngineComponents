@@ -32,7 +32,7 @@ enum class ECubismMotionPriority : uint8
 /**
  * A component to apply the motion to the specified parameters of the Cubism model.
  */
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(Blueprintable)
 class LIVE2DCUBISMFRAMEWORK_API UCubismMotionComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -121,6 +121,8 @@ private:
 	 * @brief The constructor of the component.
 	 */
 	UCubismMotionComponent();
+
+	TObjectPtr<UCubismModelComponent> GetModel();
 
 	/**
 	 * The model component that the component depends on.

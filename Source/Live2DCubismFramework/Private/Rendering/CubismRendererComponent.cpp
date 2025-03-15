@@ -26,6 +26,13 @@ UCubismRendererComponent::UCubismRendererComponent()
 	bTickInEditor = true;
 }
 
+void UCubismRendererComponent::BeginPlay() 
+{
+	Super::BeginPlay();
+
+	SpawnMaskTexture();
+}
+
 void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 {
 	check(InModel);
@@ -94,10 +101,10 @@ void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 	if (MaskTexture)
 	{
 		MaskTexture->MaskTextureComponent->ResolveMaskLayout();
+		AddTickPrerequisiteComponent(MaskTexture->MaskTextureComponent); // must render after mask texture updated
 	}
 
 	AddTickPrerequisiteComponent(Model); // must render after model updated
-	AddTickPrerequisiteComponent(MaskTexture->MaskTextureComponent); // must render after mask texture updated
 }
 
 void UCubismRendererComponent::ApplyRenderOrder()
@@ -140,14 +147,60 @@ void UCubismRendererComponent::ApplyRenderOrder()
 	}
 }
 
+void UCubismRendererComponent::SpawnMaskTexture() 
+{
+	AActor* Owner = GetOwner();
+
+	if (MaskTexture == nullptr)
+	{
+		TArray<AActor*> FoundActors;
+		UGameplayStatics::GetAllActorsOfClass(Owner->GetWorld(), ACubismMaskTexture::StaticClass(), FoundActors);
+		if (FoundActors.Num() == 0)
+		{
+			MaskTexture = Owner->GetWorld()->SpawnActor<ACubismMaskTexture>();
+		}
+		else
+		{
+			MaskTexture = (ACubismMaskTexture*)FoundActors[0];
+		}
+	}
+	else
+	{
+		MaskTexture->MaskTextureComponent->RemoveModel(Owner);
+	}
+	//Should check in case it's spawned in blueprint and the mask texture won't be placed in the blueprint scene
+	if (MaskTexture)
+	{
+#if WITH_EDITOR
+		MaskTexture->SetActorLabel(TEXT("CubismMaskTexture"));
+		MaskTexture->SetFlags(RF_Transactional);
+#endif
+		MaskTexture->MaskTextureComponent->AddModel(Owner);
+	}
+}
+
+
+TObjectPtr<UCubismModelComponent> UCubismRendererComponent::GetModel() 
+{
+	if (TObjectPtr<UCubismModelComponent> ModelComp = Cast<UCubismModelComponent>(GetOwner()->FindComponentByClass<UCubismModelComponent>()))
+	{
+		return ModelComp;
+	}
+
+	return nullptr;
+}
+
 // UObject interface
 void UCubismRendererComponent::PostLoad()
 {
 	Super::PostLoad();
 
-	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 #if WITH_EDITOR
@@ -161,7 +214,7 @@ void UCubismRendererComponent::PostEditChangeProperty(FPropertyChangedEvent& Pro
 	{
 		if (MaskTexture)
 		{
-			ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+			AActor* Owner = GetOwner();
 
 			MaskTexture->MaskTextureComponent->AddModel(Owner);
 		}
@@ -184,48 +237,35 @@ void UCubismRendererComponent::OnComponentCreated()
 {
 	Super::OnComponentCreated();
 
-	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
-
-	if (MaskTexture == nullptr)
+	if (GetWorld()->WorldType != EWorldType::EditorPreview)
 	{
-		TArray<AActor*> FoundActors;
-		UGameplayStatics::GetAllActorsOfClass(Owner->GetWorld(), ACubismMaskTexture::StaticClass(), FoundActors);
-		if (FoundActors.Num() == 0)
-		{
-			MaskTexture = Owner->GetWorld()->SpawnActor<ACubismMaskTexture>();
-			#if WITH_EDITOR
-			MaskTexture->SetActorLabel(TEXT("CubismMaskTexture"));
-			MaskTexture->SetFlags(RF_Transactional);
-			#endif
-		}
-		else
-		{
-			MaskTexture = (ACubismMaskTexture*) FoundActors[0];
-		}
-	}
-	else
-	{
-		MaskTexture->MaskTextureComponent->RemoveModel(Owner);
+		SpawnMaskTexture();
 	}
 
-	MaskTexture->MaskTextureComponent->AddModel(Owner);
+	const TObjectPtr<UCubismModelComponent> ModelComp = GetModel();
 
-	Setup(Owner->Model);
+	if (ModelComp)
+	{
+		Setup(ModelComp);
+	}
 }
 
 void UCubismRendererComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 {
 	if (MaskTexture)
 	{
-		ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+		AActor* Owner = GetOwner();
 
 		MaskTexture->MaskTextureComponent->RemoveModel(Owner);
 	}
-
-	if (Model->Renderer == this)
+	if (Model)
 	{
-		Model->Renderer = nullptr;
+		if (Model->Renderer == this)
+		{
+			Model->Renderer = nullptr;
+		}
 	}
+
 
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }

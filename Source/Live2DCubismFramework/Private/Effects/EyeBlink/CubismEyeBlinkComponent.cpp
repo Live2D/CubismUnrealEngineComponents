@@ -8,6 +8,7 @@
 
 #include "Effects/EyeBlink/CubismEyeBlinkComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Model/CubismModelActor.h"
 #include "Model/CubismModelComponent.h"
 #include "Model/CubismModel3Json.h"
@@ -16,12 +17,18 @@
 UCubismEyeBlinkComponent::UCubismEyeBlinkComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
 void UCubismEyeBlinkComponent::Setup(UCubismModelComponent* InModel)
 {
+	if (!InModel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ubismEyeBlinkComponent::Setup - InModel is null. Skipping setup."));
+		return;
+	}
+
 	check(InModel);
 
 	if (Model != InModel)
@@ -58,6 +65,11 @@ void UCubismEyeBlinkComponent::PostLoad()
 	Super::PostLoad();
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner || !Owner->Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Owner or Model."));
+		return;
+	}
 
 	Setup(Owner->Model);
 }
@@ -109,6 +121,16 @@ void UCubismEyeBlinkComponent::PostEditChangeProperty(FPropertyChangedEvent& Pro
 	{
 		Time = 0.0f;
 	}
+
+	const FName EyeBlinkPropertyName = PropertyChangedEvent.GetPropertyName();
+
+	if (EyeBlinkPropertyName == GET_MEMBER_NAME_CHECKED(UCubismEyeBlinkComponent, bEnableEyeBlinkInEditor))
+	{
+		if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor)
+		{
+			SetComponentTickEnabled(bEnableEyeBlinkInEditor);
+		}
+	}
 }
 #endif
 // End of UObject interface
@@ -121,13 +143,69 @@ void UCubismEyeBlinkComponent::OnComponentCreated()
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
 	Setup(Owner->Model);
+
+#if WITH_EDITOR
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor)
+	{
+		SetComponentTickEnabled(bEnableEyeBlinkInEditor);
+	}
+#endif
 }
+
+void UCubismEyeBlinkComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+{
+	if (Model && Model->EyeBlink == this)
+	{
+		Model->EyeBlink = nullptr;
+	}
+
+	Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
+#if WITH_EDITOR
+void UCubismEyeBlinkComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
 
 void UCubismEyeBlinkComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (IsControlledByUpdateController())
+	{
+		return;
+	}
+
+	OnCubismUpdate(DeltaTime);
+}
+
+void UCubismEyeBlinkComponent::OnCubismUpdate(float DeltaTime)
+{
+#if WITH_EDITOR
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor && !bEnableEyeBlinkInEditor)
+	{
+		return;
+	}
+#endif
+
+	if (!Model)
+	{
+		return;
+	}
+
 	Update(DeltaTime);
+
+	if (!Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("EyeBlinkComponent: Model is null."));
+		return;
+	}
 
 	for (const FString& Id : Ids)
 	{
@@ -162,6 +240,11 @@ void UCubismEyeBlinkComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 			}
 		}
 	}
+}
+
+int32 UCubismEyeBlinkComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_EYEBLINK;
 }
 // End of UActorComponent interface
 

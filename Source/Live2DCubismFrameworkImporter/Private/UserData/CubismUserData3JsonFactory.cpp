@@ -116,7 +116,7 @@ EReimportResult::Type UCubismUserData3JsonFactory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(UserData->GetClass(), UserData->GetOuter(), *UserData->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled))
+	if (ImportObject(UserData->GetClass(), UserData->GetOuter(), *UserData->GetName(), RF_Public, Filename, nullptr, OutCanceled))
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 

@@ -9,6 +9,8 @@
 #include "Live2DCubismFrameworkModule.h"
 #include "CubismLog.h"
 #include "Interfaces/IPluginManager.h"
+#include "Misc/Paths.h"
+#include "ShaderCore.h"
 
 #define LOCTEXT_NAMESPACE "FLive2DCubismFrameworkModule"
 

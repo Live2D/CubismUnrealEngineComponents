@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Expression/CubismExp3Json.h"
-
+#include "CubismUpdatableInterface.h"
 #include "CubismExpressionComponent.generated.h"
 
 class FCubismExpression;
@@ -55,7 +55,7 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismExpressionParameterValue
  * A component to apply the expression motion to the specified parameters of the Cubism model.
  */
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class LIVE2DCUBISMFRAMEWORK_API UCubismExpressionComponent : public UActorComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismExpressionComponent : public UActorComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -102,16 +102,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
 	void StopAllExpressions(const bool bForce = false);
 
+	// ICubismUpdatableInterface
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
+
+private:
+	friend class UCubismModelComponent;
+
+	/**
+	 * The model component that the component depends on.
+	 */
+	UPROPERTY()
+	TObjectPtr<UCubismModelComponent> Model;
+
 private:
 	/**
 	 * @brief The constructor of the component.
 	 */
 	UCubismExpressionComponent();
-
-	/**
-	 * The model component that the component depends on.
-	 */
-	TObjectPtr<UCubismModelComponent> Model;
 
 	/**
 	 * The internal time of the component.
@@ -154,6 +163,11 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

@@ -9,7 +9,7 @@
 #pragma once
 
 #include "EditorFramework/AssetImportData.h"
-
+#include "Engine/CurveTable.h"
 #include "CubismMotion3Json.generated.h"
 
 /**

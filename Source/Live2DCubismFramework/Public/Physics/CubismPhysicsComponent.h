@@ -7,9 +7,9 @@
 
 
 #pragma once
-
+#include "CubismUpdatableInterface.h"
 #include "Physics/CubismPhysicsRig.h"
-
+#include "Components/ActorComponent.h"
 #include "CubismPhysicsComponent.generated.h"
 
 class UCubismModelComponent;
@@ -18,7 +18,7 @@ class UCubismModelComponent;
  * A component to apply the physics to the specified parameters of the Cubism model.
  */
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class LIVE2DCUBISMFRAMEWORK_API UCubismPhysicsComponent : public UActorComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismPhysicsComponent : public UActorComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -47,6 +47,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism", meta = (ClampMin = "0.0", UIMin = "0.0", UIMax = "120.0"))
 	float Fps = 0.0f;
 
+	// ICubismUpdatableInterface
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
+
+	/**
+	 * Whether to update physics in editor mode.
+	 */
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, Category = "Live2D Cubism")
+	bool bEnablePhysicsInEditor = false;
+#endif
+
 public:
 	/**
 	 * @brief The function to set up the component.
@@ -63,15 +76,19 @@ public:
 	void Stabilization();
 
 private:
+	friend class UCubismModelComponent;
+
+	/**
+	 * The model component that the component depends on.
+	 */
+	UPROPERTY()
+	TObjectPtr<UCubismModelComponent> Model;
+
+private:
 	/**
 	 * @brief The constructor of the component.
 	 */
 	UCubismPhysicsComponent();
-
-	/**
-	 * @brief The model component that the component depends on.
-	 */
-	TObjectPtr<UCubismModelComponent> Model;
 
 	/**
 	 * The physics state of the model.
@@ -134,6 +151,11 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

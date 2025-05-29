@@ -8,15 +8,7 @@ Unreal Engine用のCubism SDKのオープンコンポーネントです。
 
 モデルをロードするには Live2D Cubism Core と組み合わせて使用します。
 
-SDKパッケージのダウンロードページをお探しの場合は、[ダウンロードページ](https://creatorsforum.live2d.com/c/cubism-sdk-ue-alpha/download/132)にアクセスしてください。
-
-## プレリリース版ソフトウェア
-
-本製品は「プレリリース版ソフトウェア」です。
-
-プレリリース版ソフトウェアは、Live2D社から提供される最終製品に相当するものではなく、バグ、エラーおよびシステム障害等またはデータの損失につながるその他の不具合を含む可能性があります。
-
-詳しくは、[ライセンス](LICENSE.md)をお読みください。
+SDKパッケージのダウンロードページをお探しの場合は、[ダウンロードページ](https://www.live2d.com/sdk/download/unrealengine/)にアクセスしてください。
 
 ## ライセンス
 
@@ -63,20 +55,20 @@ Cubismファイルをuassetファイルに変換する機能は `./Source/Live2D
 
 | Unreal Engine | バージョン |
 | --- | --- |
+| Unreal Editor 5.5 | 5.5.4 |
 | Unreal Editor 5.4 | 5.4.4 |
 | Unreal Editor 5.3 | 5.3.2 |
-| Unreal Editor 5.2 | 5.2.1 |
 
 | ライブラリ / ツール | バージョン |
 | --- | --- |
-| Visual Studio 2022 | 17.12.4 |
+| Visual Studio 2022 | 17.14.1 |
 | Windows SDK | 10.0.22621.0 |
 
 ## テスト済みの環境
 
 | プラットフォーム | バージョン |
 | --- | --- |
-| Windows 11 | 23H2 |
+| Windows 11 | 24H2 |
 
 
 ## ブランチ

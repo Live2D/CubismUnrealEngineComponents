@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "5-r.1-alpha.5",
+	"VersionName": "5-r.1-beta.1",
 	"FriendlyName": "Live2DCubismSDK",
 	"Description": "Live2D Cubism SDK for Unreal Engine Components",
 	"Category": "Other",
@@ -12,7 +12,7 @@
 	"SupportURL": "",
 	"CanContainContent": true,
 	"IsBetaVersion": true,
-	"IsExperimentalVersion": true,
+	"IsExperimentalVersion": false,
 	"Installed": false,
 	"Modules": [
 		{

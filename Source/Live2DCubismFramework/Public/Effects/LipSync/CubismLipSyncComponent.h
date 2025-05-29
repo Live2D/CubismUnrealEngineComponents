@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Model/CubismModelComponent.h"
-
+#include "CubismUpdatableInterface.h"
 #include "CubismLipSyncComponent.generated.h"
 
 class UCubismModel3Json;
@@ -18,7 +18,7 @@ class UCubismModel3Json;
  * A component to apply the lip sync effect to the specified parameters of the Cubism model.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), hidecategories = (Object, ActorComponent, Physics, Rendering, Mobility, LOD))
-class LIVE2DCUBISMFRAMEWORK_API UCubismLipSyncComponent : public UActorComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismLipSyncComponent : public UActorComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -73,6 +73,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	TObjectPtr<USoundWave> Source;
 
+	// ICubismUpdatableInterface implementation
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
+
 public:
 	/**
 	 * @brief The function to set up the component.
@@ -104,15 +109,19 @@ protected:
 	TObjectPtr<UAudioComponent> CreateAudioComponent();
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismLipSyncComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismLipSyncComponent();
 
 	/**
 	 * The internal time of the component.
@@ -168,6 +177,10 @@ public:
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

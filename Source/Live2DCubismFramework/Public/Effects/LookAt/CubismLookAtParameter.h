@@ -61,12 +61,12 @@ public:
 	/**
 	 * The factor to multiply the look-at parameter.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bEnabled"), meta = (ClampMin = "-100.0", SliderMin = "0.0", SliderMax = "100.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bEnabled"), meta = (ClampMin = "-100.0", SliderMin = "0.0", SliderMax = "100.0"), Category = "Live2D Cubism")
 	float Factor = 1.0f;
 
 	/**
 	 * The ID of the UCubismParameterComponent to which the look-at parameter is applied.
 	 */
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Live2D Cubism")
 	FString Id = TEXT("");
 };

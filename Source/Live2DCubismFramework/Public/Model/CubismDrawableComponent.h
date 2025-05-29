@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Model/CubismModelComponent.h"
-
+#include "Components/MeshComponent.h"
 #include "CubismDrawableComponent.generated.h"
 
 class UTexture2D;
@@ -197,15 +197,19 @@ public:
 	int32 GetDrawableMaskCount() const;
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismDrawableComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismDrawableComponent();
 
 	/**
 	 * The flag to indicate whether the rectangle surrounding the vertices that consist of the drawable needs to be updated.
@@ -220,16 +224,19 @@ private:
 	/**
 	 * The vertex indices of the drawable.
 	 */
+	UPROPERTY()
 	TArray<int32> VertexIndices;
 
 	/**
 	 * The vertex positions of the drawable.
 	 */
+	UPROPERTY()
 	TArray<FVector2D> VertexPositions;
 
 	/**
 	 * The vertex Uvs of the drawable.
 	 */
+	UPROPERTY()
 	TArray<FVector2D> VertexUvs;
 
 	/**
@@ -264,6 +271,12 @@ private:
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
 
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
+
+	virtual void SendRenderDynamicData_Concurrent() override;
+
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface
 
@@ -274,6 +287,4 @@ private:
 	//Begin UPrimitiveComponent Interface
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
 	//End UPrimitiveComponent Interface
-
-	virtual void SendRenderDynamicData_Concurrent() override;
 };

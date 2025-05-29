@@ -96,15 +96,19 @@ public:
 	void MultiplyParameterValue(float TargetValue, const float Weight = 1.0f);
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismParameterComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismParameterComponent();
 
 public:
 	// UObject interface
@@ -117,5 +121,9 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 	// End of UActorComponent interface
 };

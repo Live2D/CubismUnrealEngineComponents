@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "Components/ActorComponent.h"
+#include "CubismUpdatableInterface.h"
 #include "CubismPoseComponent.generated.h"
 
 class UCubismModelComponent;
@@ -50,8 +52,8 @@ struct FCubismPosePartGroupParameter
 /**
  * A component to apply the pose to the specified parameters of the Cubism model.
  */
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class LIVE2DCUBISMFRAMEWORK_API UCubismPoseComponent : public UActorComponent
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent, ImplementsInterface = "CubismUpdatableInterface"))
+class LIVE2DCUBISMFRAMEWORK_API UCubismPoseComponent : public UActorComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -68,6 +70,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	TObjectPtr<UCubismPose3Json> Json;
 
+	// CubismUpdatableInterface implementation
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
+
 public:
 	/**
 	 * @brief The function to set up the component.
@@ -76,6 +83,15 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
 	void Setup(UCubismModelComponent* InModel);
+
+private:
+	friend class UCubismModelComponent;
+
+	/**
+	 * The model component that the component depends on.
+	 */
+	UPROPERTY()
+	TObjectPtr<UCubismModelComponent> Model;
 
 private:
 	/**
@@ -99,11 +115,6 @@ private:
 	void CopyPartOpacities();
 
 	/**
-	 * The model component that the component depends on.
-	 */
-	TObjectPtr<UCubismModelComponent> Model;
-
-	/**
 	 * The list of the parts.
 	 */
 	TArray<FCubismPosePartGroupParameter> PartGroups;
@@ -119,7 +130,20 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface
+
+	/**
+	 *Whether to enable pose updates in editor mode.
+	 */
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, Category = "Live2D Cubism")
+	bool bEnablePoseInEditor = false;
+#endif
 };

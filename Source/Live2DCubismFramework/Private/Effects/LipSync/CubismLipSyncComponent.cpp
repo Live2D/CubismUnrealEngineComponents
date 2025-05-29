@@ -8,11 +8,14 @@
 
 #include "Effects/LipSync/CubismLipSyncComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Model/CubismModelActor.h"
 #include "Model/CubismModelComponent.h"
 #include "Model/CubismParameterComponent.h"
 #include "Model/CubismModel3Json.h"
 #include "Components/AudioComponent.h"
+#include "Sound/SoundWave.h"
+#include "Sound/SoundBase.h"
 
 const float FrameRate = 30.0f;
 const float Epsilon = 0.01f;
@@ -25,12 +28,18 @@ UCubismLipSyncComponent::UCubismLipSyncComponent()
 	, UserTimeSeconds(0.0f)
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
 void UCubismLipSyncComponent::Setup(UCubismModelComponent* InModel)
 {
+	if (!InModel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UCubismLipSyncComponent::Setup - InModel is null. Skipping setup."));
+		return;
+	}
+
 	check(InModel);
 
 	if (Model != InModel)
@@ -125,6 +134,11 @@ void UCubismLipSyncComponent::PostLoad()
 	Super::PostLoad();
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner || !Owner->Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Owner or Model."));
+		return;
+	}
 
 	Setup(Owner->Model);
 }
@@ -218,14 +232,51 @@ void UCubismLipSyncComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 		Audio = nullptr;
 	}
 
+	if (Model && Model->LipSync == this)
+	{
+		Model->LipSync = nullptr;
+	}
+
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }
+
+#if WITH_EDITOR
+void UCubismLipSyncComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
 
 void UCubismLipSyncComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (IsControlledByUpdateController())
+	{
+		return;
+	}
+
+	OnCubismUpdate(DeltaTime);
+}
+
+void UCubismLipSyncComponent::OnCubismUpdate(float DeltaTime)
+{
+	if (!Model)
+	{
+		return;
+	}
+
 	Update(DeltaTime);
+
+	if (!Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("LipSyncComponent Tick: Model is null."));
+		return;
+	}
 
 	for (const FString& Id : Ids)
 	{
@@ -260,6 +311,11 @@ void UCubismLipSyncComponent::TickComponent(float DeltaTime, ELevelTick TickType
 			}
 		}
 	}
+}
+
+int32 UCubismLipSyncComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_LIPSYNC;
 }
 // End of UActorComponent interface.
 

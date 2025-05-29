@@ -20,7 +20,11 @@ UCubismPartComponent::UCubismPartComponent()
 
 void UCubismPartComponent::Setup(UCubismModelComponent* InModel)
 {
-	check(InModel);
+	if (!InModel)
+	{
+		return;
+	}
+
 	check(Index >= 0 && Index < InModel->GetPartCount() || InModel->NonNativePartIds.Contains(Index));
 
 	if (Model == InModel)
@@ -90,4 +94,15 @@ void UCubismPartComponent::OnComponentCreated()
 
 	Setup(Owner->Model);
 }
+
+#if WITH_EDITOR
+void UCubismPartComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
 // End of UActorComponent interface

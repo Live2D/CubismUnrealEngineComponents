@@ -8,6 +8,7 @@
 
 #include "Pose/CubismPoseComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Model/CubismModelComponent.h"
 #include "Model/CubismParameterComponent.h"
 #include "Model/CubismPartComponent.h"
@@ -32,6 +33,12 @@ UCubismPoseComponent::UCubismPoseComponent()
 
 void UCubismPoseComponent::Setup(UCubismModelComponent* InModel)
 {
+	if (!InModel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CubismPoseComponent::Setup - InModel is null. Skipping setup."));
+		return;
+	}
+
 	check(InModel);
 
 	if (Model != InModel)
@@ -97,6 +104,11 @@ void UCubismPoseComponent::PostLoad()
 	Super::PostLoad();
 
 	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner || !Owner->Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Owner or Model."));
+		return;
+	}
 
 	Setup(Owner->Model);
 }
@@ -112,6 +124,42 @@ void UCubismPoseComponent::PostEditChangeProperty(struct FPropertyChangedEvent& 
 	{
 		Setup(Model);
 	}
+
+	const FName PosePropertyName = PropertyChangedEvent.GetPropertyName();
+
+	if (PosePropertyName == GET_MEMBER_NAME_CHECKED(UCubismPoseComponent, bEnablePoseInEditor))
+	{
+		if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor)
+		{
+			SetComponentTickEnabled(bEnablePoseInEditor);
+
+			if (!bEnablePoseInEditor && Model)
+			{
+				for (const FCubismPosePartGroupParameter& Group : PartGroups)
+				{
+					for (const FCubismPosePartParameter& PartParam : Group.Parts)
+					{
+						if (PartParam.Parameter)
+						{
+							PartParam.Parameter->SetParameterValue(1.0f);
+						}
+					}
+				}
+
+				for (const FCubismPosePartGroupParameter& Group : PartGroups)
+				{
+					for (const FCubismPosePartParameter& PartParam : Group.Parts)
+					{
+						if (PartParam.Part)
+						{
+							PartParam.Part->SetPartOpacity(1.0f);
+							Model->ParameterStore->SavePartOpacity(PartParam.Part->Index);
+						}
+					}
+				}
+			}
+		}
+	}
 }
 #endif
 // End of UObject interface
@@ -124,7 +172,35 @@ void UCubismPoseComponent::OnComponentCreated()
 	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
 	Setup(Owner->Model);
+
+#if WITH_EDITOR
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor)
+	{
+		SetComponentTickEnabled(bEnablePoseInEditor);
+	}
+#endif
 }
+
+void UCubismPoseComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+{
+	if (Model && Model->Pose == this)
+	{
+		Model->Pose = nullptr;
+	}
+
+	Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
+#if WITH_EDITOR
+void UCubismPoseComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
 
 void UCubismPoseComponent::DoFade(float DeltaTime)
 {
@@ -241,10 +317,51 @@ void UCubismPoseComponent::CopyPartOpacities()
 
 void UCubismPoseComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+#if WITH_EDITOR
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor && !bEnablePoseInEditor)
+	{
+		return;
+	}
+#endif
+
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	DoFade(DeltaTime);
+	if (IsControlledByUpdateController())
+	{
+		return;
+	}
 
+	if (!Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Model is null."));
+		return;
+	}
+
+	DoFade(DeltaTime);
 	CopyPartOpacities();
+}
+
+void UCubismPoseComponent::OnCubismUpdate(float DeltaTime)
+{
+#if WITH_EDITOR
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor && !bEnablePoseInEditor)
+	{
+		return;
+	}
+#endif
+
+	if (!Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Model is null."));
+		return;
+	}
+
+	DoFade(DeltaTime);
+	CopyPartOpacities();
+}
+
+int32 UCubismPoseComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_POSE;
 }
 // End of UActorComponent interface

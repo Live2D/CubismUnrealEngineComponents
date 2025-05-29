@@ -27,7 +27,11 @@ UCubismDrawableComponent::UCubismDrawableComponent()
 
 void UCubismDrawableComponent::Setup(UCubismModelComponent* InModel)
 {
-	check(InModel);
+	if (!InModel)
+	{
+		return;
+	}
+
 	check(Index >= 0 && Index < InModel->GetDrawableCount());
 
 	if (Model == InModel)
@@ -274,6 +278,17 @@ void UCubismDrawableComponent::OnComponentCreated()
 	Setup(Owner->Model);
 }
 
+#if WITH_EDITOR
+void UCubismDrawableComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
+
 void UCubismDrawableComponent::SendRenderDynamicData_Concurrent()
 {
 	Super::SendRenderDynamicData_Concurrent();
@@ -309,6 +324,11 @@ void UCubismDrawableComponent::SendRenderDynamicData_Concurrent()
 void UCubismDrawableComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!Model)
+	{
+		return;
+	}
 
 	if (Model->GetDrawableDynamicFlagOpacityDidChange(Index))
 	{

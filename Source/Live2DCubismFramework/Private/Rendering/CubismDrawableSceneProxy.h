@@ -8,6 +8,16 @@
 
 #pragma once
 
+#include "PrimitiveSceneProxy.h"
+#include "SceneManagement.h"
+#include "SceneView.h"
+#include "MeshBatch.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialRenderProxy.h"
+#include "SceneInterface.h"
+#include "Engine.h"
+#include "Math/Color.h"
+#include "VertexFactory.h"
 #include "CubismRenderingResource.h"
 
 /**

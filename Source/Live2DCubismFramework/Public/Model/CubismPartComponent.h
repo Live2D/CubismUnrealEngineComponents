@@ -81,15 +81,19 @@ public:
 	void SetPartOpacity(float TargetOpacity);
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismPartComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismPartComponent();
 
 public:
 	// UObject interface
@@ -102,5 +106,9 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 	// End of UActorComponent interface
 };

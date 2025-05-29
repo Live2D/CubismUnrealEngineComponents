@@ -27,7 +27,7 @@ public:
 	/**
 	 * The version of the moc.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Live2D Cubism")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Moc Data")
 	int32 Version;
 
 public:
@@ -35,20 +35,20 @@ public:
 	 * @brief The function to load the moc data into memory and assign it to the model.
 	 * @param Model The model to assign the moc to.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	UFUNCTION(BlueprintCallable, Category = "Moc Data")
 	void SetupModel(UCubismModelComponent* InModel);
 
 	/**
 	 * @brief The function to delete the moc data assigned to the model and free the memory.
 	 * @param Model The model to delete the moc data from.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	UFUNCTION(BlueprintCallable, Category = "Moc Data")
 	void DeleteModel(UCubismModelComponent* InModel);
 
 	/**
 	 * @brief The function to set up the moc data.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	UFUNCTION(BlueprintCallable, Category = "Moc Data")
 	void Setup();
 
 	////
@@ -57,14 +57,14 @@ public:
 	 * @brief The function to get the version of the Cubism Core library.
 	 * @return The version of the Cubism Core library.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	UFUNCTION(BlueprintCallable, Category = "Moc Data")
 	static int32 GetVersion();
 
 	/**
 	 * @brief The function to get the latest version of the moc that the Cubism Core library supports.
 	 * @return The latest version of the moc that the Cubism Core library supports.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	UFUNCTION(BlueprintCallable, Category = "Moc Data")
 	static int32 GetLatestMocVersion();
 
 	/**
@@ -103,7 +103,7 @@ public:
 	 * @brief The function to get the byte size of the model.
 	 * @return The byte size of the model.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	UFUNCTION(BlueprintCallable, Category = "Moc Data")
 	int32 GetSizeOfModel() const;
 
 private:

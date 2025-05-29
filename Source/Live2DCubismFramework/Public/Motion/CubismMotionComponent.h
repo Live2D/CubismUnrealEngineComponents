@@ -9,6 +9,8 @@
 #pragma once
 
 #include "Motion/CubismMotion3Json.h"
+#include "CubismUpdatableInterface.h"
+#include "Components/ActorComponent.h"
 
 #include "CubismMotionComponent.generated.h"
 
@@ -33,7 +35,7 @@ enum class ECubismMotionPriority : uint8
  * A component to apply the motion to the specified parameters of the Cubism model.
  */
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class LIVE2DCUBISMFRAMEWORK_API UCubismMotionComponent : public UActorComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismMotionComponent : public UActorComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -76,6 +78,11 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Live2D Cubism")
 	FCubismMotionPlaybackFinishedHandler OnMotionPlaybackFinished;
 
+	// ICubismUpdatableInterface
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
+
 public:
 	/**
 	 * @brief The function to set up the component.
@@ -117,15 +124,19 @@ public:
 	void StopAllMotions(const bool bForce = false);
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismMotionComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismMotionComponent();
 
 	/**
 	 * The internal time of the component.
@@ -155,6 +166,10 @@ public:
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

@@ -8,18 +8,31 @@
 
 #include "Model/CubismModelComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Model/CubismMoc3.h"
 #include "Model/CubismDrawableComponent.h"
 #include "Model/CubismParameterComponent.h"
 #include "Model/CubismPartComponent.h"
+#include "Model/CubismParameterStoreComponent.h"
+#include "Rendering/CubismRendererComponent.h"
+#include "Motion/CubismMotionComponent.h"
+#include "Expression/CubismExpressionComponent.h"
+#include "Physics/CubismPhysicsComponent.h"
+#include "Pose/CubismPoseComponent.h"
+#include "Effects/EyeBlink/CubismEyeBlinkComponent.h"
+#include "Effects/HarmonicMotion/CubismHarmonicMotionComponent.h"
+#include "Effects/LipSync/CubismLipSyncComponent.h"
+#include "Effects/LookAt/CubismLookAtComponent.h"
+#include "Effects/Raycast/CubismRaycastComponent.h"
 #include "UserData/CubismUserData3Json.h"
 
 #include "CubismLog.h"
+#include <CubismUpdateControllerComponent.h>
 
 UCubismModelComponent::UCubismModelComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
@@ -29,7 +42,10 @@ UCubismModelComponent::~UCubismModelComponent()
 
 void UCubismModelComponent::Setup()
 {
-	check(Moc);
+	if (!Moc)
+	{
+		return;
+	}
 
 	Moc->SetupModel(this);
 
@@ -47,6 +63,8 @@ void UCubismModelComponent::Setup()
 	{
 		Part->Setup(this);
 	}
+
+	SetVisibility(bRenderInWorldSpace, true);
 }
 
 ////
@@ -148,6 +166,12 @@ int32 UCubismModelComponent::GetParameterIndex(const FString ParameterId)
 	if (!ParameterIndices.Contains(ParameterId))	
 	{
 		AddParameter(ParameterId);
+	}
+
+	if (!ParameterIndices.Contains(ParameterId))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("GetParameterIndex: Failed to add parameter '%s'."), *ParameterId);
+		return -1;
 	}
 
 	return ParameterIndices[ParameterId];
@@ -298,11 +322,11 @@ void UCubismModelComponent::AddParameter(const FString ParameterId)
 	NonNativeParameterIds.Add(ParameterIndex, ParameterId);
 	NonNativeParameterValues.Add(ParameterIndex, 0.0f);
 
-	const TObjectPtr<UCubismParameterComponent>& Parameter = NewObject<UCubismParameterComponent>(this);
+	const TObjectPtr<UCubismParameterComponent>& Parameter = NewObject<UCubismParameterComponent>(this, NAME_None, RF_Transactional);
 
 	Parameter->Index = ParameterIndex;
+
 	Parameter->RegisterComponent();
-	Parameter->Setup(this);
 
 	Parameters.Add(Parameter);
 }
@@ -347,11 +371,11 @@ void UCubismModelComponent::AddPart(const FString PartId)
 	NonNativePartIds.Add(PartIndex, PartId);
 	NonNativePartOpacities.Add(PartIndex, 0.0f);
 
-	const TObjectPtr<UCubismPartComponent>& Part = NewObject<UCubismPartComponent>(this);
+	const TObjectPtr<UCubismPartComponent>& Part = NewObject<UCubismPartComponent>(this, NAME_None, RF_Transactional);
 
 	Part->Index = PartIndex;
+
 	Part->RegisterComponent();
-	Part->Setup(this);
 
 	Parts.Add(Part);
 }
@@ -527,6 +551,11 @@ void UCubismModelComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
 
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismModelComponent, bRenderInWorldSpace))
+	{
+		SetVisibility(bRenderInWorldSpace, true);
+	}
+
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismModelComponent, UserDataJson))
 	{
 		if (!UserDataJson)
@@ -626,6 +655,14 @@ void UCubismModelComponent::OnComponentCreated()
 			Parts.Add(Part);
 		}
 	}
+
+	SetVisibility(bRenderInWorldSpace, true);
+	if (GetOwner() && !GetOwner()->FindComponentByClass<UCubismUpdateControllerComponent>())
+	{
+		UCubismUpdateControllerComponent* Controller = NewObject<UCubismUpdateControllerComponent>(GetOwner(), UCubismUpdateControllerComponent::StaticClass(), TEXT("CubismUpdateController"));
+		Controller->RegisterComponent();
+		GetOwner()->AddInstanceComponent(Controller);
+	}
 }
 
 void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
@@ -635,16 +672,6 @@ void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 		Drawable->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
 		GetOwner()->RemoveInstanceComponent(Drawable);
 		Drawable->DestroyComponent();
-	}
-
-	for (const TObjectPtr<UCubismParameterComponent>& Parameter : Parameters)
-	{
-		Parameter->DestroyComponent();
-	}
-
-	for (const TObjectPtr<UCubismPartComponent>& Part : Parts)
-	{
-		Part->DestroyComponent();
 	}
 
 	Drawables.Empty();
@@ -660,15 +687,39 @@ void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }
 
+#if WITH_EDITOR
+void UCubismModelComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	Setup();
+}
+#endif
+
 void UCubismModelComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (IsControlledByUpdateController())
+	{
+		return;
+	}
+
+	OnCubismUpdate(DeltaTime);
+}
+
+void UCubismModelComponent::OnCubismUpdate(float DeltaTime)
+{
 	if (RawModel)
 	{
 		csmUpdateModel(RawModel);
 
 		csmResetDrawableDynamicFlags(RawModel);
 	}
+}
+
+int32 UCubismModelComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_MODEL;
 }
 // End of UActorComponent interface

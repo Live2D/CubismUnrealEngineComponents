@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "Components/ActorComponent.h"
+#include "CubismUpdatableInterface.h"
 #include "CubismRendererComponent.generated.h"
 
 class ACubismModel;
@@ -29,7 +31,7 @@ enum class ECubismRendererSortingOrder : uint8
  * A component to render Live2D Cubism models.
  */
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class LIVE2DCUBISMFRAMEWORK_API UCubismRendererComponent : public UActorComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismRendererComponent : public UActorComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -75,6 +77,11 @@ public:
 	 */
 	TArray<TSharedPtr<FCubismMaskJunction>> Junctions;
 
+	// ICubismUpdatableInterface implementation
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
+
 public:
 	/**
 	 * @brief The function to set up the component.
@@ -88,18 +95,22 @@ public:
 	 * @brief The function to apply the render order to the drawables.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
-	void ApplyRenderOrder();
+	int32 CalcRenderOrder(const UCubismDrawableComponent* Drawable) const;
+
+private:
+	friend class UCubismModelComponent;
+
+	/**
+	 * The model component that the component depends on.
+	 */
+	UPROPERTY()
+	TObjectPtr<UCubismModelComponent> Model;
 
 private:
 	/**
 	 * @brief The constructor of the component.
 	 */
 	UCubismRendererComponent();
-
-	/**
-	 * The model component that the component depends on.
-	 */
-	TObjectPtr<UCubismModelComponent> Model;
 
 public:	
 	// UObject interface
@@ -113,6 +124,10 @@ public:
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

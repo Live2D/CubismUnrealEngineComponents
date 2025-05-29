@@ -10,7 +10,6 @@ indent_style = tab
 indent_size = 4
 tab_width = 4
 trim_trailing_whitespace = false
-max_line_length = 150
 
 # ReSharper properties
 resharper_cpp_keep_user_linebreaks = false
@@ -30,3 +29,8 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
+
+# CI
+[.ci/**]
+indent_size = 2
+indent_style = space

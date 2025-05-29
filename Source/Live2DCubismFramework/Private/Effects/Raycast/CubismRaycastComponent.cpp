@@ -8,6 +8,7 @@
 
 #include "Effects/Raycast/CubismRaycastComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Effects/Raycast/CubismRaycastParameter.h"
 #include "Model/CubismModelActor.h"
 #include "Model/CubismModelComponent.h"
@@ -20,6 +21,12 @@ UCubismRaycastComponent::UCubismRaycastComponent()
 
 void UCubismRaycastComponent::Setup(UCubismModelComponent* InModel)
 {
+	if (!InModel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CubismRaycastComponent::Setup - InModel is null. Skipping setup."));
+		return;
+	}
+
 	check(InModel);
 
 	if (Model != InModel)
@@ -41,6 +48,15 @@ void UCubismRaycastComponent::Setup(UCubismModelComponent* InModel)
 
 			Parameters.Add(Parameter);
 		}
+	}
+
+	if (Model->Raycast != this)
+	{
+		if (Model->Raycast)
+		{
+			Model->Raycast->DestroyComponent();
+		}
+		Model->Raycast = this;
 	}
 }
 
@@ -230,6 +246,11 @@ void UCubismRaycastComponent::PostLoad()
 	Super::PostLoad();
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner || !Owner->Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Owner or Model."));
+		return;
+	}
 
 	Setup(Owner->Model);
 }
@@ -243,5 +264,35 @@ void UCubismRaycastComponent::OnComponentCreated()
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
 	Setup(Owner->Model);
+}
+
+void UCubismRaycastComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+{
+	if (Model && Model->Raycast == this)
+	{
+		Model->Raycast = nullptr;
+	}
+
+	Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
+#if WITH_EDITOR
+void UCubismRaycastComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
+
+void UCubismRaycastComponent::OnCubismUpdate(float DeltaTime)
+{
+}
+
+int32 UCubismRaycastComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_RAYCAST;
 }
 // End of UActorComponent interface

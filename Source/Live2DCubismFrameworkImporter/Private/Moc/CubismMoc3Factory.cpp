@@ -111,7 +111,7 @@ EReimportResult::Type UCubismMoc3Factory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(Moc->GetClass(), Moc->GetOuter(), *Moc->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled))
+	if (ImportObject(Moc->GetClass(), Moc->GetOuter(), *Moc->GetName(), RF_Public, Filename, nullptr, OutCanceled))
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 

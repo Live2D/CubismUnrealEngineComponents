@@ -8,6 +8,7 @@
 
 #include "Physics/CubismPhysicsComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Model/CubismParameterComponent.h"
 #include "Model/CubismModelActor.h"
 #include "Model/CubismModelComponent.h"
@@ -24,12 +25,18 @@ const float MaxDeltaTime = 5.0f;
 UCubismPhysicsComponent::UCubismPhysicsComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
 void UCubismPhysicsComponent::Setup(UCubismModelComponent* InModel)
 {
+	if (!InModel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CubismPhysicsComponent::Setup - InModel is null. Skipping setup."));
+		return;
+	}
+
 	check(InModel);
 
 	if (Model != InModel)
@@ -304,6 +311,11 @@ void UCubismPhysicsComponent::PostLoad()
 	Super::PostLoad();
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner || !Owner->Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Owner or Model."));
+		return;
+	}
 
 	Setup(Owner->Model);
 }
@@ -319,6 +331,16 @@ void UCubismPhysicsComponent::PostEditChangeProperty(struct FPropertyChangedEven
 	{
 		Setup(Model);
 	}
+
+	const FName EnablePhysicsPropertyName = PropertyChangedEvent.GetPropertyName();
+
+	if (EnablePhysicsPropertyName == GET_MEMBER_NAME_CHECKED(UCubismPhysicsComponent, bEnablePhysicsInEditor))
+	{
+		if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor)
+		{
+			bTickInEditor = bEnablePhysicsInEditor;
+		}
+	}
 }
 #endif
 // End of UObject interface
@@ -331,13 +353,70 @@ void UCubismPhysicsComponent::OnComponentCreated()
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
 	Setup(Owner->Model);
+
+#if WITH_EDITOR
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor)
+	{
+		SetComponentTickEnabled(bEnablePhysicsInEditor);
+	}
+#endif
 }
+
+void UCubismPhysicsComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+{
+	if (Model && Model->Physics == this)
+	{
+		Model->Physics = nullptr;
+	}
+
+	Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
+#if WITH_EDITOR
+void UCubismPhysicsComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
 
 void UCubismPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (IsControlledByUpdateController())
+	{
+		return;
+	}
+
+	OnCubismUpdate(DeltaTime);
+}
+
+void UCubismPhysicsComponent::OnCubismUpdate(float DeltaTime)
+{
+#if WITH_EDITOR
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::Editor && !bEnablePhysicsInEditor)
+	{
+		return;
+	}
+#endif
+
+	if (!Model)
+	{
+		return;
+	}
+
 	CurrentRemainTime += DeltaTime;
+
+	if (!Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Model is null."));
+		return;
+	}
+
 	if (CurrentRemainTime > MaxDeltaTime)
 	{
 		CurrentRemainTime = 0.0f;
@@ -349,7 +428,7 @@ void UCubismPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	{
 		ParameterCaches.SetNum(ParameterCount);
 	}
-	if (ParameterCaches.Num() < ParameterCount)
+	if (ParameterInputCaches.Num() < ParameterCount)
 	{
 		ParameterInputCaches.SetNum(ParameterCount);
 		for (int j = 0; j < ParameterCount; ++j) {
@@ -367,10 +446,11 @@ void UCubismPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 		for (int32 ParameterIndex = 0; ParameterIndex < ParameterCount; ++ParameterIndex)
 		{
-			const UCubismParameterComponent* Parameter = Model->GetParameter(ParameterIndex);
-
-			ParameterCaches[ParameterIndex] = ParameterInputCaches[ParameterIndex] * (1.0f - InputWeight) + Parameter->Value * InputWeight;
-			ParameterInputCaches[ParameterIndex] = ParameterCaches[ParameterIndex];
+			if (const UCubismParameterComponent* Parameter = Model->GetParameter(ParameterIndex))
+			{
+				ParameterCaches[ParameterIndex] = ParameterInputCaches[ParameterIndex] * (1.0f - InputWeight) + Parameter->Value * InputWeight;
+				ParameterInputCaches[ParameterIndex] = ParameterCaches[ParameterIndex];
+			}
 		}
 
 		// update each pendulum
@@ -435,5 +515,10 @@ void UCubismPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 			Output.Parameter->SetParameterValue(TargetValue);
 		}
 	}
+}
+
+int32 UCubismPhysicsComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_PHYSICS;
 }
 // End of UActorComponent interface

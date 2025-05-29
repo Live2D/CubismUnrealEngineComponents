@@ -22,7 +22,10 @@ UCubismLookAtComponent::UCubismLookAtComponent()
 
 void UCubismLookAtComponent::Setup(UCubismModelComponent* InModel)
 {
-	check(InModel);
+	if (!InModel)
+	{
+		return;
+	}
 
 	if (Model != InModel)
 	{
@@ -65,9 +68,35 @@ void UCubismLookAtComponent::OnComponentCreated()
 	Setup(Owner->Model);
 }
 
+void UCubismLookAtComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+{
+	if (Model && Model->LookAt == this)
+	{
+		Model->LookAt = nullptr;
+	}
+
+	Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
+#if WITH_EDITOR
+void UCubismLookAtComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
+
 void UCubismLookAtComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!Model)
+	{
+		return;
+	}
 
 	LastPosition = SmoothDamp(LastPosition, DeltaTime);
 

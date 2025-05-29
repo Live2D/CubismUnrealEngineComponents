@@ -22,7 +22,10 @@ UCubismHarmonicMotionComponent::UCubismHarmonicMotionComponent()
 
 void UCubismHarmonicMotionComponent::Setup(UCubismModelComponent* InModel)
 {
-	check(InModel);
+	if (!InModel)
+	{
+		return;
+	}
 
 	if (Model != InModel)
 	{
@@ -62,9 +65,35 @@ void UCubismHarmonicMotionComponent::OnComponentCreated()
 	Setup(Owner->Model);
 }
 
+void UCubismHarmonicMotionComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
+{
+	if (Model && Model->HarmonicMotion == this)
+	{
+		Model->HarmonicMotion = nullptr;
+	}
+
+	Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
+#if WITH_EDITOR
+void UCubismHarmonicMotionComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
+
 void UCubismHarmonicMotionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!Model)
+	{
+		return;
+	}
 
 	for (FCubismHarmonicMotionParameter& Parameter : Parameters)
 	{

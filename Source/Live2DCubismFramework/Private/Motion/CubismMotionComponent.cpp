@@ -8,6 +8,7 @@
 
 #include "Motion/CubismMotionComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Motion/CubismMotion3Json.h"
 #include "Motion/CubismMotion.h"
 #include "Model/CubismParameterComponent.h"
@@ -25,6 +26,12 @@ UCubismMotionComponent::UCubismMotionComponent()
 
 void UCubismMotionComponent::Setup(UCubismModelComponent* InModel)
 {
+	if (!InModel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CubismMotionComponent::Setup - InModel is null. Skipping setup."));
+		return;
+	}
+
 	check(InModel);
 
 	if (Model != InModel)
@@ -121,8 +128,22 @@ void UCubismMotionComponent::PostLoad()
 	Super::PostLoad();
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner || !Owner->Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Owner or Model."));
+		return;
+	}
 
 	Setup(Owner->Model);
+
+	if (Index >= 0 && Jsons.IsValidIndex(Index))
+	{
+		PlayMotion(Index, 0.0f, ECubismMotionPriority::Normal);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CubismMotionComponent: Animation not started (index %d)"), Index);
+	}
 }
 
 #if WITH_EDITOR
@@ -134,7 +155,14 @@ void UCubismMotionComponent::PostEditChangeProperty(struct FPropertyChangedEvent
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismMotionComponent, Index))
 	{
-		PlayMotion(Index, 0.0f, ECubismMotionPriority::Force);
+		if (Jsons.IsValidIndex(Index))
+		{
+			PlayMotion(Index, 0.0f, ECubismMotionPriority::Force);
+		}
+		else
+		{
+			StopAllMotions();
+		}
 	}
 }
 #endif
@@ -152,6 +180,8 @@ void UCubismMotionComponent::OnComponentCreated()
 
 void UCubismMotionComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 {
+	if (!Model) return;
+
 	if (Model->Motion == this)
 	{
 		Model->Motion = nullptr;
@@ -160,9 +190,35 @@ void UCubismMotionComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }
 
+#if WITH_EDITOR
+void UCubismMotionComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
+
 void UCubismMotionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (IsControlledByUpdateController())
+	{
+		return;
+	}
+
+	OnCubismUpdate(DeltaTime);
+}
+
+void UCubismMotionComponent::OnCubismUpdate(float DeltaTime)
+{
+	if (!Model)
+	{
+		return;
+	}
 
 	Time += Speed * DeltaTime;
 
@@ -201,6 +257,11 @@ void UCubismMotionComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 
 		OnMotionPlaybackFinished.Broadcast();
 	}
+}
+
+int32 UCubismMotionComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_MOTION;
 }
 // End of UActorComponent interface
 

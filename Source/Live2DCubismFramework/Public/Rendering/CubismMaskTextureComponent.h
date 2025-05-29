@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Model/CubismModelActor.h"
-#include "Rendering/CubismShaders.h"
+#include "Engine/TextureRenderTarget2D.h"
 
 #include "CubismMaskTextureComponent.generated.h"
 
@@ -124,6 +124,11 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

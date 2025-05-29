@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "Components/ActorComponent.h"
+
 #include "CubismParameterStoreComponent.generated.h"
 
 class UCubismModelComponent;
@@ -56,15 +58,19 @@ public:
 	void LoadParameters();
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismParameterStoreComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismParameterStoreComponent();
 
 	/**
 	 * The saved values of the parameters.
@@ -84,6 +90,10 @@ public:
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

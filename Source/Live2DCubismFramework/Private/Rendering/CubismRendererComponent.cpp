@@ -8,6 +8,7 @@
 
 #include "Rendering/CubismRendererComponent.h"
 
+#include "CubismUpdateExecutionOrder.h"
 #include "Model/CubismDrawableComponent.h"
 #include "Model/CubismPartComponent.h"
 #include "Model/CubismModelActor.h"
@@ -15,19 +16,28 @@
 #include "Rendering/CubismMaskTexture.h"
 #include "Rendering/CubismMaskTextureComponent.h"
 #include "Rendering/CubismMaskJunction.h"
+#include "Rendering/CubismShaders.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Texture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
 
 UCubismRendererComponent::UCubismRendererComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickGroup = TG_DuringPhysics;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	bTickInEditor = true;
 }
 
 void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 {
+	if (!InModel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CubismRendererComponent::Setup - InModel is null. Skipping setup."));
+		return;
+	}
+
 	check(InModel);
 
 	Model = InModel;
@@ -89,43 +99,9 @@ void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 		Model->Renderer = this;
 	}
 
-	ApplyRenderOrder();
-
-	if (MaskTexture)
-	{
-		MaskTexture->MaskTextureComponent->ResolveMaskLayout();
-	}
-
-	AddTickPrerequisiteComponent(Model); // must render after model updated
-	AddTickPrerequisiteComponent(MaskTexture->MaskTextureComponent); // must render after mask texture updated
-}
-
-void UCubismRendererComponent::ApplyRenderOrder()
-{
 	for (const TObjectPtr<UCubismDrawableComponent>& Drawable : Model->Drawables)
 	{
-		int32 NewRenderOrder = Drawable->RenderOrder + Drawable->RenderOrderOffset;
-
-		switch (SortingOrder)
-		{
-			case ECubismRendererSortingOrder::FrontToBack:
-			{
-				break;
-			}
-			case ECubismRendererSortingOrder::BackToFront:
-			{
-				NewRenderOrder = Model->GetDrawableCount() - NewRenderOrder - 1;
-
-				break;
-			}
-			default:
-			{
-				ensure(false);
-				break;
-			}
-		}
-
-		NewRenderOrder += RenderOrder;
+		const int32 NewRenderOrder = CalcRenderOrder(Drawable);
 
 		if (bZSort)
 		{
@@ -138,6 +114,44 @@ void UCubismRendererComponent::ApplyRenderOrder()
 			Drawable->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
 		}
 	}
+
+	if (MaskTexture)
+	{
+		ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+		MaskTexture->MaskTextureComponent->AddModel(Owner);
+		MaskTexture->MaskTextureComponent->ResolveMaskLayout();
+		AddTickPrerequisiteComponent(MaskTexture->MaskTextureComponent); // must render after mask texture updated
+	}
+
+	AddTickPrerequisiteComponent(Model); // must render after model updated
+}
+
+int32 UCubismRendererComponent::CalcRenderOrder(const UCubismDrawableComponent* Drawable) const
+{
+	int32 NewRenderOrder = Drawable->RenderOrder + Drawable->RenderOrderOffset;
+
+	switch (SortingOrder)
+	{
+		case ECubismRendererSortingOrder::FrontToBack:
+		{
+			break;
+		}
+		case ECubismRendererSortingOrder::BackToFront:
+		{
+			NewRenderOrder = Model->GetDrawableCount() - NewRenderOrder - 1;
+
+			break;
+		}
+		default:
+		{
+			ensure(false);
+			break;
+		}
+	}
+
+	NewRenderOrder += RenderOrder;
+
+	return NewRenderOrder;
 }
 
 // UObject interface
@@ -146,6 +160,11 @@ void UCubismRendererComponent::PostLoad()
 	Super::PostLoad();
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner || !Owner->Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Owner or Model."));
+		return;
+	}
 
 	Setup(Owner->Model);
 }
@@ -173,7 +192,21 @@ void UCubismRendererComponent::PostEditChangeProperty(FPropertyChangedEvent& Pro
 		PropertyName == GET_MEMBER_NAME_CHECKED(UCubismRendererComponent, RenderOrder) ||
 		PropertyName == GET_MEMBER_NAME_CHECKED(UCubismRendererComponent, Epsilon))
 	{
-		ApplyRenderOrder();
+		for (const TObjectPtr<UCubismDrawableComponent>& Drawable : Model->Drawables)
+		{
+			const int32 NewRenderOrder = CalcRenderOrder(Drawable);
+
+			if (bZSort)
+			{
+				Drawable->SetTranslucentSortPriority(0);
+				Drawable->SetRelativeLocation(FVector(NewRenderOrder * Epsilon, 0.0f, 0.0f));
+			}
+			else
+			{
+				Drawable->SetTranslucentSortPriority(NewRenderOrder);
+				Drawable->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
+			}
+		}
 	}
 }
 #endif
@@ -193,10 +226,13 @@ void UCubismRendererComponent::OnComponentCreated()
 		if (FoundActors.Num() == 0)
 		{
 			MaskTexture = Owner->GetWorld()->SpawnActor<ACubismMaskTexture>();
-			#if WITH_EDITOR
-			MaskTexture->SetActorLabel(TEXT("CubismMaskTexture"));
-			MaskTexture->SetFlags(RF_Transactional);
-			#endif
+			if (MaskTexture)
+			{
+#if WITH_EDITOR
+				MaskTexture->SetActorLabel(TEXT("CubismMaskTexture"));
+				MaskTexture->SetFlags(RF_Transactional);
+#endif
+			}
 		}
 		else
 		{
@@ -208,13 +244,13 @@ void UCubismRendererComponent::OnComponentCreated()
 		MaskTexture->MaskTextureComponent->RemoveModel(Owner);
 	}
 
-	MaskTexture->MaskTextureComponent->AddModel(Owner);
-
 	Setup(Owner->Model);
 }
 
 void UCubismRendererComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 {
+	if (!Model) return;
+
 	if (MaskTexture)
 	{
 		ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
@@ -222,7 +258,7 @@ void UCubismRendererComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 		MaskTexture->MaskTextureComponent->RemoveModel(Owner);
 	}
 
-	if (Model->Renderer == this)
+	if (Model && Model->Renderer == this)
 	{
 		Model->Renderer = nullptr;
 	}
@@ -230,9 +266,38 @@ void UCubismRendererComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }
 
+#if WITH_EDITOR
+void UCubismRendererComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
+
 void UCubismRendererComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (IsControlledByUpdateController())
+	{
+		return;
+	}
+
+	OnCubismUpdate(DeltaTime);
+}
+
+void UCubismRendererComponent::OnCubismUpdate(float DeltaTime)
+{
+	if (!Model)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Model is null."));
+		return;
+	}
+
+	TArray<FDrawInfo> DrawInfos;
 
 	for (const TSharedPtr<FCubismMaskJunction>& Junction : Junctions)
 	{
@@ -283,7 +348,76 @@ void UCubismRendererComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 				MaterialInstance->SetVectorParameterValue("Offset", Junction->Offset);
 				MaterialInstance->SetVectorParameterValue("Channel", Junction->Channel);
 			}
+
+			if (Model->RenderTarget)
+			{
+				const TArray<int32>& Indices = Drawable->GetVertexIndices();
+				const TArray<FVector2D>& Positions = Drawable->GetVertexPositions();
+				const TArray<FVector2D>& UVs = Drawable->GetVertexUvs();
+
+				FDrawInfo DrawInfo;
+
+				DrawInfo.BlendMode = Drawable->BlendMode;
+				DrawInfo.RenderOrder = CalcRenderOrder(Drawable);
+
+				for (int32 i = 0; i < Indices.Num(); ++i)
+				{
+					DrawInfo.Indices.Add((uint16)Indices[i]);
+				}
+
+				for (int32 i = 0; i < Positions.Num(); ++i)
+				{
+					FCubismMeshVertex Vertex;
+
+					Vertex.Position = (FVector2f)Positions[i];
+					Vertex.UV = (FVector2f)UVs[i];
+
+					DrawInfo.Vertices.Add(Vertex);
+				}
+
+				DrawInfo.MainTexture = MainTexture->GetResource();
+
+				DrawInfo.BaseColor = FVector4f(BaseColor);
+				DrawInfo.MultiplyColor = FVector4f(MultiplyColor);
+				DrawInfo.ScreenColor = FVector4f(ScreenColor);
+
+				DrawInfo.IsMasked = Drawable->IsMasked();
+
+				if (Drawable->IsMasked())
+				{
+					DrawInfo.InvertedMask = Drawable->InvertedMask;
+					DrawInfo.MaskTexture = Junction->RenderTarget->GetResource();
+					DrawInfo.Offset = FVector4f(Junction->Offset);
+					DrawInfo.Channel = FVector4f(Junction->Channel);
+				}
+
+				DrawInfos.Add(DrawInfo);
+			}
 		}
 	}
+
+	if (Model->RenderTarget)
+	{
+		FTextureRenderTargetResource* RenderTargetResource = Model->RenderTarget->GameThread_GetRenderTargetResource();
+
+		// sort by render order
+		DrawInfos.Sort([](const FDrawInfo& A, const FDrawInfo& B)
+		{
+			return A.RenderOrder < B.RenderOrder;
+		});
+
+		// Draw the mask to the render target.
+		ENQUEUE_RENDER_COMMAND(DrawCommand)(
+			[this, RenderTargetResource, DrawInfos](FRHICommandList& RHICmdList)
+			{
+				DrawCubismMesh_RenderThread(RHICmdList, RenderTargetResource, DrawInfos);
+			}
+		);
+	}
+}
+
+int32 UCubismRendererComponent::GetExecutionOrder() const
+{
+	return CUBISM_EXECUTION_ORDER_RENDERER;
 }
 // End of UActorComponent interface

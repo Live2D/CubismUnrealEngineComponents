@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Model/CubismModelComponent.h"
-
+#include "CubismUpdatableInterface.h"
 #include "CubismEyeBlinkComponent.generated.h"
 
 class UCubismModel3Json;
@@ -29,7 +29,7 @@ enum class ECubismEyeBlinkPhase : uint8
  * A component to apply the eye blink effect to the specified parameters of the Cubism model.
  */
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class LIVE2DCUBISMFRAMEWORK_API UCubismEyeBlinkComponent : public UActorComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismEyeBlinkComponent : public UActorComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -102,6 +102,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	TArray<FString> Ids;
 
+	// ICubismUpdatableInterface
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
+
+	/**
+	 * Whether to enable blinking in editor mode.
+	 */
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, Category = "Live2D Cubism")
+	bool bEnableEyeBlinkInEditor = false;
+#endif
+
 public:
 	/**
 	 * @brief The function to set up the component.
@@ -112,15 +125,19 @@ public:
 	void Setup(UCubismModelComponent* InModel);
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismEyeBlinkComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismEyeBlinkComponent();
 
 	/**
 	 * The state of eye blink.
@@ -154,6 +171,11 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

@@ -32,7 +32,7 @@ struct LIVE2DCUBISMFRAMEWORK_API FCubismUserDataEntry
 	/**
 	 * The property corresponding to the `Id` and `Value` fields in a user data object.
 	 */
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "User Data")
 	TMap<FString, FString> Tags;
 };
 

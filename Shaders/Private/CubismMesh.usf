@@ -1,0 +1,62 @@
+/**
+ * Copyright(c) Live2D Inc. All rights reserved.
+ *
+ * Use of this source code is governed by the Live2D Open Software license
+ * that can be found at https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html.
+ */
+
+
+#include "/Engine/Public/Platform.ush"
+
+void MainVS(
+	in float2 InPosition : ATTRIBUTE0, in float2 InUV : ATTRIBUTE1,
+	out float4 OutPosition : SV_POSITION, out float2 OutUV : TEXCOORD0, out float2 OutMaskUV : TEXCOORD1
+)
+{
+	OutPosition = float4(-InPosition.x, InPosition.y, 0.0, 1.0);
+
+	OutUV.x =       InUV.x;
+	OutUV.y = 1.0 - InUV.y;
+	OutMaskUV = InPosition.xy;
+}
+
+Texture2D MainTexture;
+SamplerState MainSampler;
+float4 BaseColor;
+float4 MultiplyColor;
+float4 ScreenColor;
+
+Texture2D MaskTexture;
+SamplerState MaskSampler;
+float4 Offset;
+float4 Channel;
+
+void MainPS(
+	in float4 InPosition : SV_POSITION, in float2 InUV : TEXCOORD0, in float2 InMaskUV : TEXCOORD1,
+	out float4 OutColor : SV_Target0
+)
+{
+	float4 texColor = MainTexture.Sample(MainSampler, InUV);
+
+	texColor.rgb *= MultiplyColor.rgb;
+	texColor.rgb += (1.0 - texColor.rgb) * ScreenColor.rgb;
+
+	texColor *= BaseColor;
+
+	#if IS_MASKED
+	InMaskUV += Offset.xy;
+	InMaskUV *= Offset.z;
+
+	float clipMask = dot(MaskTexture.Sample(MaskSampler, InMaskUV), Channel);
+
+	#if INVERTED
+	texColor.a *= 1.0 - clipMask;
+	#else
+	texColor.a *= clipMask;
+	#endif // INVERTED
+	#endif // IS_MASKED
+
+	texColor.rgb *= texColor.a; // premultiplied alpha
+
+	OutColor = texColor;
+}

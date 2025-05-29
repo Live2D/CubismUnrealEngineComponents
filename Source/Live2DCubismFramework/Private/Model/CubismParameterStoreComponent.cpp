@@ -8,6 +8,8 @@
 
 #include "Model/CubismParameterStoreComponent.h"
 
+#include "Components/ActorComponent.h"
+
 #include "Model/CubismParameterComponent.h"
 #include "Model/CubismPartComponent.h"
 #include "Model/CubismModelActor.h"
@@ -21,7 +23,10 @@ UCubismParameterStoreComponent::UCubismParameterStoreComponent()
 
 void UCubismParameterStoreComponent::Setup(UCubismModelComponent* InModel)
 {
-	check(InModel);
+	if (!InModel)
+	{
+		return;
+	}
 
 	if (Model != InModel)
 	{
@@ -46,18 +51,29 @@ void UCubismParameterStoreComponent::Setup(UCubismModelComponent* InModel)
 
 void UCubismParameterStoreComponent::SaveParameterValue(const int32 ParameterIndex)
 {
-	ParameterValues.Add(ParameterIndex, Model->GetParameter(ParameterIndex)->Value);
+	if (const UCubismParameterComponent* Parameter = Model->GetParameter(ParameterIndex))
+	{
+		ParameterValues.Add(ParameterIndex, Parameter->Value);
+	}
 }
 
 void UCubismParameterStoreComponent::SavePartOpacity(const int32 PartIndex)
 {
-	PartOpacities.Add(PartIndex, Model->GetPart(PartIndex)->Opacity);
+	if (const UCubismPartComponent* Part = Model->GetPart(PartIndex))
+	{
+		PartOpacities.Add(PartIndex, Part->Opacity);
+	}
 }
 
 void UCubismParameterStoreComponent::SaveParameters()
 {
 	for (const TObjectPtr<UCubismParameterComponent>& Parameter : Model->Parameters)
 	{
+		if (!IsValid(Parameter))
+		{
+			continue;
+		}
+
 		if (ParameterValues.Contains(Parameter->Index))
 		{
 			ParameterValues[Parameter->Index] = Parameter->Value;
@@ -70,6 +86,11 @@ void UCubismParameterStoreComponent::SaveParameters()
 
 	for (const TObjectPtr<UCubismPartComponent>& Part : Model->Parts)
 	{
+		if (!IsValid(Part))
+		{
+			continue;
+		}
+
 		if (PartOpacities.Contains(Part->Index))
 		{
 			PartOpacities[Part->Index] = Part->Opacity;
@@ -85,6 +106,11 @@ void UCubismParameterStoreComponent::LoadParameters()
 {
 	for (const TObjectPtr<UCubismParameterComponent>& Parameter : Model->Parameters)
 	{
+		if (!IsValid(Parameter))
+		{
+			continue;
+		}
+
 		if (ParameterValues.Contains(Parameter->Index))
 		{
 			Parameter->SetParameterValue(ParameterValues[Parameter->Index]);
@@ -97,6 +123,11 @@ void UCubismParameterStoreComponent::LoadParameters()
 
 	for (const TObjectPtr<UCubismPartComponent>& Part : Model->Parts)
 	{
+		if (!IsValid(Part))
+		{
+			continue;
+		}
+
 		if (PartOpacities.Contains(Part->Index))
 		{
 			Part->SetPartOpacity(PartOpacities[Part->Index]);
@@ -131,7 +162,7 @@ void UCubismParameterStoreComponent::OnComponentCreated()
 
 void UCubismParameterStoreComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 {
-	if (Model->ParameterStore == this)
+	if (Model && Model->ParameterStore == this)
 	{
 		Model->ParameterStore = nullptr;
 	}
@@ -139,9 +170,25 @@ void UCubismParameterStoreComponent::OnComponentDestroyed(bool bDestroyingHierar
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }
 
+#if WITH_EDITOR
+void UCubismParameterStoreComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
+
 void UCubismParameterStoreComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!Model)
+	{
+		return;
+	}
 
 	LoadParameters();
 }

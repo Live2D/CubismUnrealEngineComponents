@@ -52,37 +52,37 @@ public:
 	/**
 	 * The time scale of the harmonic motion.
 	 */
-	UPROPERTY(EditAnywhere, meta=(ClampMin="0.0", SliderMin="0.0", SliderMax="100.0"))
+	UPROPERTY(EditAnywhere, meta=(ClampMin="0.0", SliderMin="0.0", SliderMax="100.0"), Category = "Live2D Cubism")
 	float TimeScale = 1.0f;
 
 	/**
 	 * The direction of the harmonic motion.
 	 */
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Live2D Cubism")
 	ECubismHarmonicMotionDirection Direction = ECubismHarmonicMotionDirection::Centric;
 
 	/**
 	 * The normalized origin of the harmonic motion.
 	 */
-	UPROPERTY(EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", SliderMin="0.0", SliderMax="1.0"))
+	UPROPERTY(EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", SliderMin="0.0", SliderMax="1.0"), Category = "Live2D Cubism")
 	float NormalizedOrigin = 0.5f;
 
 	/**
 	 * The normalized range of the harmonic motion.
 	 */
-	UPROPERTY(EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", SliderMin="0.0", SliderMax="1.0"))
+	UPROPERTY(EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", SliderMin="0.0", SliderMax="1.0"), Category = "Live2D Cubism")
 	float NormalizedRange = 0.5f;
 
 	/**
 	 * The duration of the harmonic motion.
 	 */
-	UPROPERTY(EditAnywhere, meta=(ClampMin="0.01", ClampMax="10.0", SliderMin="0.01", SliderMax="10.0"))
+	UPROPERTY(EditAnywhere, meta=(ClampMin="0.01", ClampMax="10.0", SliderMin="0.01", SliderMax="10.0"), Category = "Live2D Cubism")
 	float Duration = 3.0f;
 
 	/**
 	 * The ID of the UCubismParameterComponent to which the parameter is applied.
 	 */
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Live2D Cubism")
 	FString Id = TEXT("");
 
 public:

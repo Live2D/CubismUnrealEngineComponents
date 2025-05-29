@@ -19,5 +19,5 @@ public:
 	virtual void ShutdownModule() override;
 
 private:
-    bool bIsModuleStarted;
+	bool bIsModuleStarted;
 };

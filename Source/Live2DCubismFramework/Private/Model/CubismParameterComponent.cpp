@@ -22,7 +22,11 @@ UCubismParameterComponent::UCubismParameterComponent()
 
 void UCubismParameterComponent::Setup(UCubismModelComponent* InModel)
 {
-	check(InModel);
+	if (!InModel)
+	{
+		return;
+	}
+
 	check(Index >= 0 && Index < InModel->GetParameterCount() || InModel->NonNativeParameterIds.Contains(Index));
 
 	if (Model == InModel)
@@ -137,4 +141,15 @@ void UCubismParameterComponent::OnComponentCreated()
 
 	Setup(Owner->Model);
 }
+
+#if WITH_EDITOR
+void UCubismParameterComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	Setup(Owner->Model);
+}
+#endif
 // End of UActorComponent interface

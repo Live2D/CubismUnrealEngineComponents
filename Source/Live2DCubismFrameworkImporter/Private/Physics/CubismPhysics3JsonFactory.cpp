@@ -116,7 +116,7 @@ EReimportResult::Type UCubismPhysics3JsonFactory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(Physics->GetClass(), Physics->GetOuter(), *Physics->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled))
+	if (ImportObject(Physics->GetClass(), Physics->GetOuter(), *Physics->GetName(), RF_Public, Filename, nullptr, OutCanceled))
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 

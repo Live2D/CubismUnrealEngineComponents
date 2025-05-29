@@ -8,15 +8,7 @@ Welcome to the open components of the Cubism SDK for Unreal Engine.
 
 It is used in conjunction with the Live2D Cubism Core.
 
-Go [here](https://community.live2d.com/categories/downloadue) if you're looking for the download page of the SDK package.
-
-## Pre-release Software
-
-This product is "Pre-release Software".
-
-The Pre-release Software is not Live2D’s commercial product and may include bugs, errors, and other deficiencies which may arise system errors or data loss.
-
-For more details, please read the [license](LICENSE.md).
+Go [here](https://www.live2d.com/en/sdk/download/unrealengine/) if you're looking for the download page of the SDK package.
 
 ## License
 
@@ -63,20 +55,20 @@ Resources like shaders and other assets are located in `./Content/Materials`.
 
 | Unreal Engine | Version |
 | --- | --- |
+| Unreal Editor 5.5 | 5.5.4 |
 | Unreal Editor 5.4 | 5.4.4 |
 | Unreal Editor 5.3 | 5.3.2 |
-| Unreal Editor 5.2 | 5.2.1 |
 
 | Library / Tool | Version |
 | --- | --- |
-| Visual Studio 2022 | 17.12.4 |
+| Visual Studio 2022 | 17.14.1 |
 | Windows SDK | 10.0.22621.0 |
 
 ## Tested environment
 
 | Platform | Version |
 | --- | --- |
-| Windows 11 | 23H2 |
+| Windows 11 | 24H2 |
 
 ## Branches
 

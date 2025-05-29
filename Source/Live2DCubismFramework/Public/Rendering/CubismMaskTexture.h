@@ -30,6 +30,10 @@ private:
 	ACubismMaskTexture()
 	{
 		MaskTextureComponent = CreateDefaultSubobject<UCubismMaskTextureComponent>(TEXT("CubismTextureComponent"));
+
+		#if WITH_EDITORONLY_DATA
+			bIsSpatiallyLoaded = false;
+		#endif
 	}
 
 private:
@@ -38,6 +42,6 @@ private:
 	/**
 	 * A component to control the mask texture.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, BlueprintReadOnly, meta=(ExposeFunctionCategories="Sprite,Rendering,Physics,Components", AllowPrivateAccess="true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, BlueprintReadOnly, meta=(ExposeFunctionCategories="Sprite,Rendering,Physics,Components", AllowPrivateAccess="true"), Category = "Live2D Cubism")
 	TObjectPtr<UCubismMaskTextureComponent> MaskTextureComponent;
 };

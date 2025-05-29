@@ -23,14 +23,14 @@ struct LIVE2DCUBISMFRAMEWORK_API FExpressionEntry
 	/**
 	 * The property corresponding to the `Name` field in an expression object.
 	 */
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Model Data")
 	FString Name;
 
 	/**
 	 * The property corresponding to the `File` field in an expression object.
 	 * This field specifies the path to the exp3.json file.
 	 */
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Model Data")
 	FString Path;
 };
 
@@ -46,14 +46,14 @@ struct LIVE2DCUBISMFRAMEWORK_API FMotionGroupEntry
 	 * The property corresponding to the key field in a motion group object.
 	 * This field specifies the name of the motion group.
 	 */
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Model Data")
 	FString Name;
 
 	/**
 	 * The property corresponding to the value field in a motion group object.
 	 * This field specifies the paths to the motion3.json files.
 	 */
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Model Data")
 	TArray<FString> Paths;
 };
 
@@ -68,13 +68,13 @@ struct LIVE2DCUBISMFRAMEWORK_API FHitAreaEntry
 	/**
 	 * The property corresponding to the `Id` field in a hit area object.
 	 */
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Model Data")
 	FString Id;
 
 	/**
 	 * The property corresponding to the `Name` field in a hit area object.
 	 */
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Model Data")
 	FString Name;
 };
 

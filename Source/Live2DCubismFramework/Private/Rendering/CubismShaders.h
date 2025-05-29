@@ -8,76 +8,89 @@
 
 #pragma once
 
+#include "Model/CubismDrawableComponent.h"
+#include "GlobalShader.h"
 #include "ShaderParameterStruct.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+#include "TextureResource.h"
 #include "DataDrivenShaderPlatformInfo.h"
-#endif
+#include "Runtime/Launch/Resources/Version.h"
 
-struct FCubismMeshMaskVertex
+enum ECubismMeshPSType : int32
+{
+	Normal,
+	Masked,
+	InvertedMasked,
+};
+
+struct FCubismMeshVertex
 {
 	FVector2f Position; // ATTRIBUTE0
 	FVector2f UV;       // ATTRIBUTE1
 };
 
-struct FMaskDrawInfo
+struct FDrawInfo
 {
+	ECubismDrawableBlendMode BlendMode;
+	int32 RenderOrder;
 	TArray<uint16> Indices;
-	TArray<FCubismMeshMaskVertex> Vertices;
-	FVector4 Offset;
-	FVector4 Channel;
+	TArray<FCubismMeshVertex> Vertices;
 	FTexture* MainTexture;
+	FVector4f BaseColor;
+	FVector4f MultiplyColor;
+	FVector4f ScreenColor;
+	bool IsMasked;
+	bool InvertedMask;
+	FTexture* MaskTexture;
+	FVector4f Offset;
+	FVector4f Channel;
 };
 
-/*** Cubism Mask Shader ***/
+/*** Cubism Shader ***/
 
-void DrawMask_RenderThread(FRHICommandList& RHICmdList, FTextureRenderTargetResource* RenderTargetResource, const TArray<FMaskDrawInfo>& MaskDrawInfos);
+void DrawCubismMesh_RenderThread(FRHICommandList& RHICmdList, FTextureRenderTargetResource* RenderTargetResource, const TArray<FDrawInfo>& DrawInfos);
 
-class FCubismMeshMaskVS : public FGlobalShader
+class FCubismMeshVS : public FGlobalShader
 {
-	DECLARE_GLOBAL_SHADER(FCubismMeshMaskVS);
+	DECLARE_GLOBAL_SHADER(FCubismMeshVS);
 
-	FCubismMeshMaskVS() {}
-	FCubismMeshMaskVS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
+	FCubismMeshVS() {}
+	FCubismMeshVS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
 		: FGlobalShader(Initializer)
-	{
-		Offset.Bind(Initializer.ParameterMap, TEXT("Offset"));
-	}
+	{ }
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
 		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
 	}
-
-	#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-	void SetParameters(FRHIBatchedShaderParameters& BatchedParameters, const FVector4& InOffset)
-	{
-		SetShaderValue(BatchedParameters, Offset, (FVector4f)InOffset);
-	}
-	#else
-	template<typename TShaderRHIParamRef>
-	void SetParameters(FRHICommandList& RHICmdList, const TShaderRHIParamRef ShaderRHI, const FVector4& InOffset)
-	{
-		SetShaderValue(RHICmdList, ShaderRHI, Offset, (FVector4f)InOffset);
-	}
-	#endif
-
-private:
-	LAYOUT_FIELD(FShaderParameter, Offset);
 };
 
-class FCubismMeshMaskPS : public FGlobalShader
+template<ECubismMeshPSType CubismMeshPSType>
+class FCubismMeshPS : public FGlobalShader
 {
-	DECLARE_GLOBAL_SHADER(FCubismMeshMaskPS);
-	SHADER_USE_PARAMETER_STRUCT(FCubismMeshMaskPS, FGlobalShader);
+	DECLARE_GLOBAL_SHADER(FCubismMeshPS);
+	SHADER_USE_PARAMETER_STRUCT(FCubismMeshPS, FGlobalShader);
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER(FVector4f, Channel)
 		SHADER_PARAMETER_TEXTURE(Texture2D, MainTexture)
 		SHADER_PARAMETER_SAMPLER(SamplerState, MainSampler)
+		SHADER_PARAMETER(FVector4f, BaseColor)
+		SHADER_PARAMETER(FVector4f, MultiplyColor)
+		SHADER_PARAMETER(FVector4f, ScreenColor)
+		SHADER_PARAMETER_TEXTURE(Texture2D, MaskTexture)
+		SHADER_PARAMETER_SAMPLER(SamplerState, MaskSampler)
+		SHADER_PARAMETER(FVector4f, Offset)
+		SHADER_PARAMETER(FVector4f, Channel)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
 		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+	}
+
+	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
+	{
+		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+		OutEnvironment.SetDefine(TEXT("IS_MASKED"), CubismMeshPSType == ECubismMeshPSType::Masked || CubismMeshPSType == ECubismMeshPSType::InvertedMasked);
+		OutEnvironment.SetDefine(TEXT("INVERTED"), CubismMeshPSType == ECubismMeshPSType::InvertedMasked);
 	}
 };

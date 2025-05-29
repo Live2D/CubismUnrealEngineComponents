@@ -9,7 +9,9 @@
 #pragma once
 
 #include "Live2DCubismCore.h"
-
+#include "CubismUpdatableInterface.h"
+#include "Components/SceneComponent.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "CubismModelComponent.generated.h"
 
 class UCubismMoc3;
@@ -28,6 +30,7 @@ class UCubismEyeBlinkComponent;
 class UCubismHarmonicMotionComponent;
 class UCubismLipSyncComponent;
 class UCubismLookAtComponent;
+class UCubismRaycastComponent;
 
 /**
  * An enumeration for the blend mode of a drawable.
@@ -65,7 +68,7 @@ enum class ECubismParameterType : uint8
  * A component to control a Live2D Cubism model.
  */
 UCLASS(Blueprintable)
-class LIVE2DCUBISMFRAMEWORK_API UCubismModelComponent : public USceneComponent
+class LIVE2DCUBISMFRAMEWORK_API UCubismModelComponent : public USceneComponent, public ICubismUpdatableInterface
 {
 	GENERATED_BODY()
 
@@ -155,6 +158,24 @@ public:
 	TObjectPtr<UCubismLookAtComponent> LookAt;
 
 	/**
+	 * The component that controls the raycast.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Live2D Cubism")
+	TObjectPtr<UCubismRaycastComponent> Raycast;
+
+	/**
+	 * The flag to specify whether to render the model in world space.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	bool bRenderInWorldSpace = true;
+
+	/**
+	 * The texture render target to render the model.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Texture")
+	TObjectPtr<UTextureRenderTarget2D> RenderTarget;
+
+	/**
 	 * The list of textures that the model uses.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Texture")
@@ -201,6 +222,11 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	FLinearColor ScreenColor = FLinearColor::Black;
+
+	// ICubismUpdatableInterface implementation
+	virtual bool IsControlledByUpdateController() const override { return true; }
+	virtual int32 GetExecutionOrder() const override;
+	virtual void OnCubismUpdate(float DeltaTime) override;
 
 public:
 	/**
@@ -699,6 +725,10 @@ public:
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

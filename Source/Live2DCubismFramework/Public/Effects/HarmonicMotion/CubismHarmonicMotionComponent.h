@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "Components/ActorComponent.h"
 #include "CubismHarmonicMotionComponent.generated.h"
 
 class UCubismModelComponent;
@@ -38,15 +39,19 @@ public:
 	void Setup(UCubismModelComponent* InModel);
 
 private:
-	/**
-	 * @brief The constructor of the component.
-	 */
-	UCubismHarmonicMotionComponent();
+	friend class UCubismModelComponent;
 
 	/**
 	 * The model component that the component depends on.
 	 */
+	UPROPERTY()
 	TObjectPtr<UCubismModelComponent> Model;
+
+private:
+	/**
+	 * @brief The constructor of the component.
+	 */
+	UCubismHarmonicMotionComponent();
 
 	/**
 	 * The internal time of the component.
@@ -60,6 +65,11 @@ public:
 
 	// UActorComponent interface
 	virtual void OnComponentCreated() override;
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+
+#if WITH_EDITOR
+	virtual void PostEditUndo() override;
+#endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// End of UActorComponent interface

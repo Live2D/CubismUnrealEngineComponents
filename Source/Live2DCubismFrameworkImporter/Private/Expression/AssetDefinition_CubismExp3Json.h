@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Expression/CubismExp3Json.h"
+#include "CubismAssetImporterDefinitions.hpp"
 #include "AssetDefinitionDefault.h"
 
 #include "AssetDefinition_CubismExp3Json.generated.h"
@@ -23,7 +24,7 @@ public:
 	virtual FText GetAssetDisplayName() const override { return NSLOCTEXT("AssetTypeActions", "AssetTypeActions_CubismExp3Json", "CubismExp3Json"); }
 	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor::Orange); }
 	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UCubismExp3Json::StaticClass(); }
-	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override { return TArray<FAssetCategoryPath>(); }
+	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override { return CubismDefaultAssetCategory; }
 	virtual bool CanImport() const override { return true; }
 	// UAssetDefinition End
 };

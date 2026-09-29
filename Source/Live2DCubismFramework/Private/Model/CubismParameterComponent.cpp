@@ -27,7 +27,10 @@ void UCubismParameterComponent::Setup(UCubismModelComponent* InModel)
 		return;
 	}
 
-	check(Index >= 0 && Index < InModel->GetParameterCount() || InModel->NonNativeParameterIds.Contains(Index));
+	if ((Index < 0 || Index >= InModel->GetParameterCount()) && !InModel->NonNativeParameterIds.Contains(Index))
+	{
+		return;
+	}
 
 	if (Model == InModel)
 	{
@@ -62,44 +65,67 @@ void UCubismParameterComponent::Setup(UCubismModelComponent* InModel)
 
 void UCubismParameterComponent::SetParameterValue(float TargetValue, const float Weight)
 {
-	float CurrentValue = Weight == 1.0f? TargetValue : Model->GetParameterValue(Index) * (1.0f - Weight) + TargetValue * Weight;
-
-	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
+	if (!Model)
 	{
-		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
+		return;
 	}
+	float CurrentValue = Weight == 1.0f
+		? TargetValue
+		: Value * (1.0f - Weight) + TargetValue * Weight;
 
 	Value = CurrentValue;
-
 	Model->SetParameterValue(Index, CurrentValue);
 }
 
 void UCubismParameterComponent::AddParameterValue(float TargetValue, const float Weight)
 {
-	float CurrentValue = Model->GetParameterValue(Index) + TargetValue * Weight;
-
-	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
+	if (!Model)
 	{
-		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
+		return;
 	}
-
-	Value = CurrentValue;
-
-	Model->SetParameterValue(Index, CurrentValue);
+	SetParameterValue(Value + TargetValue, Weight);
 }
 
 void UCubismParameterComponent::MultiplyParameterValue(float TargetValue, const float Weight)
 {
-	float CurrentValue = Model->GetParameterValue(Index) * (1.0f + (TargetValue - 1.0f) * Weight);
+	SetParameterValue(Value * (1.0f + (TargetValue - 1.0f) * Weight), Weight);
+}
 
-	if (!FGenericPlatformMath::IsNaN(MinimumValue) && !FGenericPlatformMath::IsNaN(MaximumValue))
+bool UCubismParameterComponent::IsRepeat() const
+{
+	if (!Model)
 	{
-		CurrentValue = FMath::Clamp(CurrentValue, MinimumValue, MaximumValue);
+		return false;
 	}
 
-	Value = CurrentValue;
+	if (Model->GetOverrideFlagForModelParameterRepeat())
+	{
+		return bRepeat;
+	}
 
-	Model->SetParameterValue(Index, CurrentValue);
+	if (bOverrideRepeat)
+	{
+		return bRepeat;
+	}
+	
+	const unsigned char* RepeatFlags = csmGetParameterRepeats(Model->RawModel);
+	return (RepeatFlags && Index >= 0) ? (RepeatFlags[Index] != 0) : false;
+}
+
+float UCubismParameterComponent::GetParameterRepeatValue(float InValue) const
+{
+	const float Range = MaximumValue - MinimumValue;
+
+	if (Range <= KINDA_SMALL_NUMBER) return MinimumValue;
+
+	float t = FMath::Fmod(InValue - MinimumValue, Range);
+	if (t < 0.0f) t += Range;
+	return MinimumValue + t;
+}
+
+float UCubismParameterComponent::GetParameterClampValue(float InValue) const
+{
+	return FMath::Clamp(InValue, MinimumValue, MaximumValue);
 }
 
 // UObject interface
@@ -109,6 +135,15 @@ void UCubismParameterComponent::PostLoad()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -121,6 +156,10 @@ void UCubismParameterComponent::PostEditChangeProperty(FPropertyChangedEvent& Pr
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismParameterComponent, Value))
 	{
+		if (!Model)
+		{
+			return;
+		}
 		Model->SetParameterValue(Index, Value);
 
 		if(Model->ParameterStore)
@@ -139,6 +178,15 @@ void UCubismParameterComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -149,7 +197,21 @@ void UCubismParameterComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif
+
+void UCubismParameterComponent::OverrideValue(float InValue, float Weight)
+{
+	SetParameterValue(InValue, Weight);
+}
 // End of UActorComponent interface

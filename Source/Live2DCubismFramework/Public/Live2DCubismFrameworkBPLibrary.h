@@ -28,7 +28,6 @@ public:
 	 * @param Model3Json The model asset to load
 	 * @param Transform The transform to set for the spawned actor
 	 * @param bRenderInWorldSpace Whether to render the model in world space or not
-	 * @param RenderTarget The render target to draw the model to (optional)
 	 * @return The spawned model actor
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism", meta = (WorldContext = "WorldContextObject"))
@@ -36,7 +35,6 @@ public:
 		UObject* WorldContextObject,
 		UCubismModel3Json* Model3Json,
 		const FTransform& Transform,
-		const bool bRenderInWorldSpace = true,
-		UTextureRenderTarget2D* RenderTarget = nullptr
+		const bool bRenderInWorldSpace = true
 	);
 };

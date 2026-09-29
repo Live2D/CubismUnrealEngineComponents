@@ -15,8 +15,7 @@ ACubismModel* ULive2DCubismFrameworkBPLibrary::SpawnCubismModel(
 	UObject* WorldContextObject,
 	UCubismModel3Json* Model3Json,
 	const FTransform& Transform,
-	const bool bRenderInWorldSpace,
-	UTextureRenderTarget2D* RenderTarget
+	const bool bRenderInWorldSpace
 )
 {
 	if (!WorldContextObject || !Model3Json)
@@ -41,7 +40,6 @@ ACubismModel* ULive2DCubismFrameworkBPLibrary::SpawnCubismModel(
 	ModelActor->SetActorTransform(Transform);
 	ModelActor->Model->bRenderInWorldSpace = bRenderInWorldSpace;
 	ModelActor->Model->SetVisibility(bRenderInWorldSpace, true);
-	ModelActor->Model->RenderTarget = RenderTarget;
 
 	return ModelActor;
 }

@@ -297,6 +297,34 @@ TSharedPtr<SWidget> SCubismModelParameterControllerWindow::BuildParameterList()
 
 			+ SHorizontalBox::Slot()
 			.AutoWidth()
+			.Padding(10.0f, 0.0f)
+			[
+				SNew(SCheckBox)
+					.IsChecked_Lambda([Parameter]() {
+					return Parameter->bOverrideRepeat ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+					.OnCheckStateChanged_Lambda([Parameter](ECheckBoxState NewState) {
+					Parameter->bOverrideRepeat = (NewState == ECheckBoxState::Checked);
+				})
+					.ToolTipText(FText::FromString("Override Repeat"))
+			]
+
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(10.0f, 0.0f)
+			[
+				SNew(SCheckBox)
+					.IsChecked_Lambda([Parameter]() {
+					return Parameter->bRepeat ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				})
+					.OnCheckStateChanged_Lambda([Parameter](ECheckBoxState NewState) {
+					Parameter->bRepeat = (NewState == ECheckBoxState::Checked);
+				})
+					.ToolTipText(FText::FromString("Repeat Enabled"))
+			]
+
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
 			.Padding(5.0f, 0.0f)
 			[
 				SNew(SButton)

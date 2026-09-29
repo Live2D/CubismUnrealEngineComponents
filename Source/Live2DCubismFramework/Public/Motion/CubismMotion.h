@@ -90,6 +90,23 @@ public:
 	 */
 	float EndTime;
 
+	/**
+	 * The phase time within the current loop cycle at the previous tick,
+	 * used to detect a loop seam. (seconds)
+	 */
+	float PrevPhaseTime = 0.0f;
+
+	/**
+	 * The reference (anchor) time used to evaluate the fade-in curve.
+	 * Updated on loop seam when bLoopFadeIn is true. (seconds)
+	 */
+	float FadeInAnchorTime = 0.0f;
+
+	/**
+	 * The flag to determine whether the fade-in anchor resets at each loop seam.
+	 */
+	bool bLoopFadeIn = true;
+
 public:
 	/**
 	 * The function to initialize the state of the motion.

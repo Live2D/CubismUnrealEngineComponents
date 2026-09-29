@@ -51,6 +51,15 @@ void UCubismHarmonicMotionComponent::PostLoad()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 // End of UObject interface
@@ -62,6 +71,15 @@ void UCubismHarmonicMotionComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -82,6 +100,15 @@ void UCubismHarmonicMotionComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif
@@ -109,8 +136,8 @@ void UCubismHarmonicMotionComponent::TickComponent(float DeltaTime, ELevelTick T
 			continue;
 		}
 
-		Time += DeltaTime * Parameter.TimeScale;
-		Parameter.Value = Parameter.CalcValue(Time, Destination->MinimumValue, Destination->MaximumValue);
+		Parameter.InternalTime += DeltaTime * Parameter.TimeScale;
+		Parameter.Value = Parameter.CalcValue(Parameter.InternalTime, Destination->MinimumValue, Destination->MaximumValue);
 
 		switch (Parameter.BlendMode)
 		{

@@ -142,6 +142,15 @@ void UCubismExpressionComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -161,7 +170,15 @@ void UCubismExpressionComponent::PostEditUndo()
 	Super::PostEditUndo();
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+	if (!Owner)
+	{
+		return;
+	}
 
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif
@@ -331,14 +348,12 @@ void UCubismExpressionComponent::UpdateExpression(const int32 ExpressionIndex, c
 			{
 				NewAdditiveValue = Parameter.Value;
 				NewMultiplyValue = 1.0f;
-				NewOverwriteValue = NewOverwriteValue;
 				break;
 			}
 			case ECubismParameterBlendMode::Multiplicative:
 			{
 				NewAdditiveValue = 0.0f;
 				NewMultiplyValue = Parameter.Value;
-				NewOverwriteValue = NewOverwriteValue;
 				break;
 			}
 			case ECubismParameterBlendMode::Overwrite:

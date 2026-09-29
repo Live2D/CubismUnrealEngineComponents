@@ -352,6 +352,15 @@ void UCubismPhysicsComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 
 #if WITH_EDITOR
@@ -379,6 +388,15 @@ void UCubismPhysicsComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif

@@ -32,7 +32,10 @@ void UCubismDrawableComponent::Setup(UCubismModelComponent* InModel)
 		return;
 	}
 
-	check(Index >= 0 && Index < InModel->GetDrawableCount());
+	if (Index < 0 || Index >= InModel->GetDrawableCount())
+	{
+		return;
+	}
 
 	if (Model == InModel)
 	{
@@ -198,6 +201,15 @@ void UCubismDrawableComponent::PostLoad()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -205,6 +217,11 @@ void UCubismDrawableComponent::PostLoad()
 void UCubismDrawableComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	if (!Model)
+	{
+		return;
+	}
 
 	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
 
@@ -275,6 +292,15 @@ void UCubismDrawableComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -285,6 +311,15 @@ void UCubismDrawableComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif
@@ -297,20 +332,24 @@ void UCubismDrawableComponent::SendRenderDynamicData_Concurrent()
 	{
 		FCubismDrawableDynamicMeshData NewDynamicData;
 
-		NewDynamicData.Index = Index;
-
-		for (const FVector2D& LocalPosition : GetVertexPositions())
 		{
-			NewDynamicData.Positions.Add(FVector3f(ToGlobalPosition(LocalPosition)));
-		}
+			FRWScopeLock ReadLock(DynamicDataGuard, SLT_ReadOnly);
 
-		for (const FVector2D& UV : GetVertexUvs())
-		{
-			NewDynamicData.UVs.Add(FVector2f(UV));
-		}
+			NewDynamicData.Index = Index;
 
-		NewDynamicData.Indices.Append(VertexIndices);
-		NewDynamicData.bTwoSided = bTwoSided;
+			for (const FVector2D& LocalPosition : GetVertexPositions())
+			{
+				NewDynamicData.Positions.Add(FVector3f(ToGlobalPosition(LocalPosition)));
+			}
+
+			for (const FVector2D& UV : GetVertexUvs())
+			{
+				NewDynamicData.UVs.Add(FVector2f(UV));
+			}
+
+			NewDynamicData.Indices.Append(VertexIndices);
+			NewDynamicData.bTwoSided = bTwoSided;
+		}
 
 		ENQUEUE_RENDER_COMMAND(DrawableUpdateDynamicData)(
 			[DrawableProxy, NewDynamicData](FRHICommandListImmediate& RHICmdList)
@@ -337,15 +376,20 @@ void UCubismDrawableComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 
 	if (Model->GetDrawableDynamicFlagVertexPositionsDidChange(Index))
 	{
-		VertexPositions.Empty();
+		FRWScopeLock WriteLock(DynamicDataGuard, SLT_Write);
 
-		const csmVector2* DrawableVertexPositions(Model->GetDrawableVertexPosition(Index));
-		const int32 VertexCount(Model->GetDrawableVertexCount(Index));
-		VertexPositions.Reserve(VertexCount);
+		const csmVector2* DrawableVertexPositions = Model->GetDrawableVertexPosition(Index);
+		const int32 VertexCount = Model->GetDrawableVertexCount(Index);
+
+		if (VertexPositions.Num() != VertexCount)
+		{
+			VertexPositions.SetNum(VertexCount);
+		}
+
 
 		for (int32 i = 0; i < VertexCount; i++)
-		{	
-			VertexPositions.Add(FVector2D(-DrawableVertexPositions[i].X, DrawableVertexPositions[i].Y));
+		{
+			VertexPositions[i] = FVector2D(-DrawableVertexPositions[i].X, DrawableVertexPositions[i].Y);
 		}
 
 		bBoundsDirty = true;

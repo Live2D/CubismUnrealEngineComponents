@@ -170,6 +170,12 @@ public:
 	bool bRenderInWorldSpace = true;
 
 	/**
+	* Whether to override parameter repeat for the entire model.
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	bool bOverrideParameterRepeat = false;
+
+	/**
 	 * The texture render target to render the model.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Texture")
@@ -341,6 +347,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
 	UCubismParameterComponent* GetParameter(const FString ParameterId);
 
+	/**
+	 * @brief The function to get the value of the parameter at the specified index.
+	 * @param ParameterIndex The index of the parameter.
+	 * @return The value of the parameter.
+	 */
+	float GetParameterValue(const int32 ParameterIndex) const;
+
+	/**
+	 * @brief The function to set the value of the parameter at the specified index.
+	 * @param ParameterIndex The index of the parameter.
+	 * @param Value The value to set.
+	 */
+	void SetParameterValue(const int32 ParameterIndex, const float Value);
+
 	////
 
 	/**
@@ -382,6 +402,18 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
 	UCubismPartComponent* GetPart(const FString PartId);
+
+	/**
+	* Returns whether parameter repeat is overridden for the entire model.
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	bool GetOverrideFlagForModelParameterRepeat() const { return bOverrideParameterRepeat; }
+
+	/**
+	 * Sets whether parameter repeat is overridden for the entire model.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	void SetOverrideFlagForModelParameterRepeat(bool bValue) { bOverrideParameterRepeat = bValue; }
 
 private:
 	/**
@@ -605,20 +637,6 @@ private:
 	float GetParameterDefaultValue(const int32 ParameterIndex) const;
 
 	/**
-	 * @brief The function to get the value of the parameter at the specified index.
-	 * @param ParameterIndex The index of the parameter.
-	 * @return The value of the parameter.
-	 */
-	float GetParameterValue(const int32 ParameterIndex) const;
-
-	/**
-	 * @brief The function to set the value of the parameter at the specified index.
-	 * @param ParameterIndex The index of the parameter.
-	 * @param Value The value to set.
-	 */
-	void SetParameterValue(const int32 ParameterIndex, const float Value);
-
-	/**
 	 * @brief The function to get the number of keys of the parameter at the specified index.
 	 * @param ParameterIndex The index of the parameter.
 	 * @return The number of keys of the parameter.
@@ -707,6 +725,8 @@ private:
 
 private:
 	friend class UCubismMoc3;
+
+	void SetParameterValueRaw(int32 ParameterIndex, float Value);
 
 	/**
 	 * The raw model data.

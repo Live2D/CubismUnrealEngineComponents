@@ -152,6 +152,10 @@ void UCubismLipSyncComponent::PostEditChangeProperty(FPropertyChangedEvent& Prop
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismLipSyncComponent, Value))
 	{
+		if (!Model)
+		{
+			return;
+		}
 		for (const FString& Id : Ids)
 		{
 			UCubismParameterComponent* Destination = Model->GetParameter(Id);
@@ -215,6 +219,15 @@ void UCubismLipSyncComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -247,6 +260,15 @@ void UCubismLipSyncComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif

@@ -8,320 +8,156 @@
 
 #pragma once
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
+#include "CubismDrawableDynamicMeshData.h"
+#include "CubismVertexBuffer.h"
+#include "CubismUshortIndexBuffer.h"
+
 #include "Materials/MaterialRenderProxy.h"
 #include "DataDrivenShaderPlatformInfo.h"
-#else
-#include "ShaderParameterStruct.h"
-#endif
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-#include "PrimitiveUniformShaderParametersBuilder.h"
-#else
-#include "ResourcePool.h"
-#endif
-
-/**
- * Dynamic mesh data for a drawable.
- */
-struct FCubismDrawableDynamicMeshData
-{
-	int32 Index;
-	TArray<FVector3f> Positions;
-	TArray<FVector2f> UVs;
-	TArray<uint16> Indices;
-	bool bTwoSided;
-};
-
 /**
  * Vertex buffer for a drawable.
  */
-class FCubismDrawableVertexBuffer : public FRenderResource
+class FCubismDrawableResource : public FRenderResource
 {
 public:
-	FCubismDrawableVertexBuffer(const FCubismDrawableDynamicMeshData& DynamicData)
-		: Positions(DynamicData.Positions)
-		, UVs(DynamicData.UVs)
-	{ }
-
-	#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-	virtual void InitRHI(FRHICommandListBase& RHICmdList) override
-	#else
-	virtual void InitRHI() override
-	#endif
+	FCubismDrawableResource(const FCubismDrawableDynamicMeshData& DynamicData, ERHIFeatureLevel::Type FeatureLevel) : LocalVertexFactory({ FeatureLevel, "CubismLocalVertexFactory" })
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(FCubismDrawableVertexBuffer::InitRHI)
+		PositionBuffer.Init(DynamicData.Positions, TEXT("CubismPositionVertexBuffer"), true);
+		UVBuffer.Init(DynamicData.UVs, TEXT("CubismUvVertexBuffer"), true);
+		TangentXBuffer.Init(FPackedNormal(FVector4f(1.0f, 0.0f, 0.0f, 1.0f)), DynamicData.Positions.Num(), TEXT("CubismTangentVertexBuffer"), true);
+		TangentZBuffer.Init(FPackedNormal(FVector4f(0.0f, 0.0f, 1.0f, 0.0f)), DynamicData.Positions.Num(), TEXT("CubismNormalVertexBuffer"), true);
 
-		// Initialize Position Buffer
-		{
-			const uint32 SizeInBytes = sizeof(FVector3f) * Positions.Num();
-
-			FRHIResourceCreateInfo PositionVertexBufferInfo(TEXT("PositionVertexBuffer"));
-			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-			PositionBuffer.VertexBufferRHI = RHICmdList.CreateVertexBuffer(SizeInBytes, BUF_Volatile, PositionVertexBufferInfo);
-			void* PositionBufferData = RHICmdList.LockBuffer(PositionBuffer.VertexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-			FMemory::Memcpy(PositionBufferData, Positions.GetData(), SizeInBytes);
-			RHICmdList.UnlockBuffer(PositionBuffer.VertexBufferRHI);
-			#else
-			PositionBuffer.VertexBufferRHI = RHICreateVertexBuffer(SizeInBytes, BUF_Volatile, PositionVertexBufferInfo);
-			void* PositionBufferData = RHILockBuffer(PositionBuffer.VertexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-			FMemory::Memcpy(PositionBufferData, Positions.GetData(), SizeInBytes);
-			RHIUnlockBuffer(PositionBuffer.VertexBufferRHI);
-			#endif
-		}
-
-		// Initialize UV Buffer
-		{
-			const uint32 SizeInBytes = sizeof(FVector2f) * UVs.Num();
-
-			FRHIResourceCreateInfo UVVertexBufferInfo(TEXT("UVVertexBuffer"));
-			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-			UVBuffer.VertexBufferRHI = RHICmdList.CreateVertexBuffer(SizeInBytes, BUF_Volatile, UVVertexBufferInfo);
-			void* UVBufferData = RHICmdList.LockBuffer(UVBuffer.VertexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-			FMemory::Memcpy(UVBufferData, UVs.GetData(), SizeInBytes);
-			RHICmdList.UnlockBuffer(UVBuffer.VertexBufferRHI);
-			#else
-			UVBuffer.VertexBufferRHI = RHICreateVertexBuffer(SizeInBytes, BUF_Volatile, UVVertexBufferInfo);
-			void* UVBufferData = RHILockBuffer(UVBuffer.VertexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-			FMemory::Memcpy(UVBufferData, UVs.GetData(), SizeInBytes);
-			RHIUnlockBuffer(UVBuffer.VertexBufferRHI);
-			#endif
-		}
-
-		// Initialize Tangent Buffer (unused)
-		{
-			const uint32 SizeInBytes = 2 * sizeof(FPackedNormal) * Positions.Num();
-
-			FRHIResourceCreateInfo TangentVertexBufferInfo(TEXT("TangentVertexBuffer"));
-			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-			TangentBuffer.VertexBufferRHI = RHICmdList.CreateVertexBuffer(SizeInBytes, BUF_Volatile, TangentVertexBufferInfo);
-			#else
-			TangentBuffer.VertexBufferRHI = RHICreateVertexBuffer(SizeInBytes, BUF_Volatile, TangentVertexBufferInfo);
-			#endif
-		}
-
-		// Initialize Color Buffer (unused)
-		{
-			const uint32 SizeInBytes = sizeof(FColor) * Positions.Num();
-
-			FRHIResourceCreateInfo ColorVertexBufferInfo(TEXT("ColorVertexBuffer"));
-			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-			ColorBuffer.VertexBufferRHI = RHICmdList.CreateVertexBuffer(SizeInBytes, BUF_Volatile, ColorVertexBufferInfo);
-			#else
-			ColorBuffer.VertexBufferRHI = RHICreateVertexBuffer(SizeInBytes, BUF_Volatile, ColorVertexBufferInfo);
-			#endif
-		}
-
-		if (RHISupportsManualVertexFetch(GMaxRHIShaderPlatform))
-		{
-			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-			PositionBufferSRV = RHICmdList.CreateShaderResourceView(PositionBuffer.VertexBufferRHI, sizeof(float), PF_R32_FLOAT);
-			UVBufferSRV = RHICmdList.CreateShaderResourceView(UVBuffer.VertexBufferRHI, sizeof(FVector2f), PF_G32R32F);
-			TangentBufferSRV = RHICmdList.CreateShaderResourceView(TangentBuffer.VertexBufferRHI, 4, PF_R8G8B8A8_SNORM);
-			ColorBufferSRV = RHICmdList.CreateShaderResourceView(ColorBuffer.VertexBufferRHI, 4, PF_R8G8B8A8);
-			#else
-			PositionBufferSRV = RHICreateShaderResourceView(PositionBuffer.VertexBufferRHI, sizeof(float), PF_R32_FLOAT);
-			UVBufferSRV = RHICreateShaderResourceView(UVBuffer.VertexBufferRHI, sizeof(FVector2f), PF_G32R32F);
-			TangentBufferSRV = RHICreateShaderResourceView(TangentBuffer.VertexBufferRHI, 4, PF_R8G8B8A8_SNORM);
-			ColorBufferSRV = RHICreateShaderResourceView(ColorBuffer.VertexBufferRHI, 4, PF_R8G8B8A8);
-			#endif
-		}
+		IndexBuffer.Init(DynamicData.Indices, TEXT("CubismIndexBuffer"), true);
 	}
 
-	#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-	void InitResource(FRHICommandListBase& RHICmdList) override
+	virtual void InitRHI(FRHICommandListBase& RHICmdList) override
 	{
-		FRenderResource::InitResource(RHICmdList);
+		TRACE_CPUPROFILER_EVENT_SCOPE(FCubismDrawableResource::InitRHI)
+
 
 		PositionBuffer.InitResource(RHICmdList);
+		PositionBuffer.InitRHI(RHICmdList);
+
 		UVBuffer.InitResource(RHICmdList);
-		TangentBuffer.InitResource(RHICmdList);
-		ColorBuffer.InitResource(RHICmdList);
-	}
-	#else
-	void InitResource() override
-	{
-		FRenderResource::InitResource();
+		UVBuffer.InitRHI(RHICmdList);
 
-		PositionBuffer.InitResource();
-		UVBuffer.InitResource();
-		TangentBuffer.InitResource();
-		ColorBuffer.InitResource();
-	}
-	#endif
+		TangentXBuffer.InitResource(RHICmdList);
+		TangentXBuffer.InitRHI(RHICmdList);
 
-	void ReleaseResource() override
-	{
-		FRenderResource::ReleaseResource();
+		TangentZBuffer.InitResource(RHICmdList);
+		TangentZBuffer.InitRHI(RHICmdList);
 
-		PositionBuffer.ReleaseResource();
-		UVBuffer.ReleaseResource();
-		TangentBuffer.ReleaseResource();
-		ColorBuffer.ReleaseResource();
+
+		IndexBuffer.InitResource(RHICmdList);
+		IndexBuffer.InitRHI(RHICmdList);
+
+
+		FLocalVertexFactory::FDataType Data;
+		MakeLocalVertexFactoryData(Data);
+		
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 4
+		LocalVertexFactory.SetData(RHICmdList, Data);
+#else
+		LocalVertexFactory.SetData(Data);
+#endif
+		LocalVertexFactory.InitResource(RHICmdList);
 	}
 
 	virtual void ReleaseRHI() override
 	{
-		PositionBuffer.VertexBufferRHI.SafeRelease();
-		UVBuffer.VertexBufferRHI.SafeRelease();
-		TangentBuffer.VertexBufferRHI.SafeRelease();
-		ColorBuffer.VertexBufferRHI.SafeRelease();
+		LocalVertexFactory.ReleaseResource();
+
+
+		TangentZBuffer.ReleaseResource();
+		TangentXBuffer.ReleaseResource();
+		UVBuffer.ReleaseResource();
+		PositionBuffer.ReleaseResource();
+		
+
+		IndexBuffer.ReleaseResource();
 	}
 
-	void UpdateBuffer(const TArray<FVector3f>& NewPositions, const TArray<FVector2f>& NewUVs)
+	void UpdateBuffer(const FCubismDrawableDynamicMeshData& dynamicMeshData)
 	{
-		ENQUEUE_RENDER_COMMAND(UpdateVertexBuffer)(
-			[this, NewPositions, NewUVs](FRHICommandListImmediate& RHICmdList)
+		const uint32 PositionSizeInBytes = FCubismVertexBuffer<FVector3f>::Stride * dynamicMeshData.Positions.Num();
+		const uint32 UVsSizeInBytes = FCubismVertexBuffer<FVector2f>::Stride * dynamicMeshData.UVs.Num();
+		const uint32 IndicesSizeInBytes = FCubismUshortIndexBuffer::Stride * dynamicMeshData.Indices.Num();
+
+
+		ensure(PositionBuffer.GetNumVertices() == dynamicMeshData.Positions.Num());
+		ensure(UVBuffer.GetNumVertices() == dynamicMeshData.UVs.Num());
+		ensure(IndexBuffer.GetNumIndices() == dynamicMeshData.Indices.Num());
+
+
+		ENQUEUE_RENDER_COMMAND(FCubismRenderingResource_UpdateBuffer)(
+			[this, dynamicMeshData, PositionSizeInBytes, UVsSizeInBytes, IndicesSizeInBytes](FRHICommandListImmediate& RHICmdList)
 			{
-				// Update Position Buffer
 				{
-					const uint32 SizeInBytes = sizeof(FVector3f) * NewPositions.Num();
-					void* PositionBufferData = RHICmdList.LockBuffer(PositionBuffer.VertexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-					FMemory::Memcpy(PositionBufferData, NewPositions.GetData(), SizeInBytes);
+					void* PositionBufferData = RHICmdList.LockBuffer(PositionBuffer.VertexBufferRHI, 0, PositionSizeInBytes, RLM_WriteOnly);
+					FMemory::Memcpy(PositionBufferData, dynamicMeshData.Positions.GetData(), PositionSizeInBytes);
 					RHICmdList.UnlockBuffer(PositionBuffer.VertexBufferRHI);
 				}
-
-				// Update UV Buffer
 				{
-					const uint32 SizeInBytes = sizeof(FVector2f) * NewUVs.Num();
-					void* UVBufferData = RHICmdList.LockBuffer(UVBuffer.VertexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-					FMemory::Memcpy(UVBufferData, NewUVs.GetData(), SizeInBytes);
+					void* UVBufferData = RHICmdList.LockBuffer(UVBuffer.VertexBufferRHI, 0, UVsSizeInBytes, RLM_WriteOnly);
+					FMemory::Memcpy(UVBufferData, dynamicMeshData.UVs.GetData(), UVsSizeInBytes);
 					RHICmdList.UnlockBuffer(UVBuffer.VertexBufferRHI);
+				}
+				{
+					void* IndexBufferData = RHICmdList.LockBuffer(IndexBuffer.IndexBufferRHI, 0, IndicesSizeInBytes, RLM_WriteOnly);
+					FMemory::Memcpy(IndexBufferData, dynamicMeshData.Indices.GetData(), IndicesSizeInBytes);
+					RHICmdList.UnlockBuffer(IndexBuffer.IndexBufferRHI);
 				}
 			}
 		);
+
+
+		FMemory::Memcpy(PositionBuffer.GetVertexData(), dynamicMeshData.Positions.GetData(), PositionSizeInBytes);
+		FMemory::Memcpy(UVBuffer.GetVertexData(), dynamicMeshData.UVs.GetData(), UVsSizeInBytes);
+		FMemory::Memcpy(IndexBuffer.GetIndexData(), dynamicMeshData.Indices.GetData(), IndicesSizeInBytes);
 	}
 
-public:
-	FVertexBuffer PositionBuffer;
-	FVertexBuffer UVBuffer;
-	FVertexBuffer TangentBuffer;
-	FVertexBuffer ColorBuffer;
-
-	FShaderResourceViewRHIRef PositionBufferSRV;
-	FShaderResourceViewRHIRef UVBufferSRV;
-	FShaderResourceViewRHIRef TangentBufferSRV;
-	FShaderResourceViewRHIRef ColorBufferSRV;
-
-	TArray<FVector3f> Positions;
-	TArray<FVector2f> UVs;
-};
-
-/**
- * Index buffer for a drawable.
- */
-class FCubismDrawableIndexBuffer : public FIndexBuffer
-{
-public:
-	FCubismDrawableIndexBuffer(const FCubismDrawableDynamicMeshData& DynamicData)
-		: Indices(DynamicData.Indices)
-	{ }
-
-	#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-	virtual void InitRHI(FRHICommandListBase& RHICmdList) override
-	#else
-	virtual void InitRHI() override
-	#endif
+	const FLocalVertexFactory* GetLocalVertexFactoryPointer() const
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(FCubismDrawableIndexBuffer::InitRHI)
-
-		const uint32 SizeInBytes = sizeof(uint16) * Indices.Num();
-
-		FRHIResourceCreateInfo IndexBufferInfo(TEXT("IndexBuffer"));
-		#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-		IndexBufferRHI = RHICmdList.CreateIndexBuffer(sizeof(uint16), SizeInBytes, BUF_Volatile, IndexBufferInfo);
-		void* IndexBufferData = RHICmdList.LockBuffer(IndexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-		FMemory::Memcpy(IndexBufferData, Indices.GetData(), SizeInBytes);
-		RHICmdList.UnlockBuffer(IndexBufferRHI);
-		#else
-		IndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), SizeInBytes, BUF_Volatile, IndexBufferInfo);
-		void* IndexBufferData = RHILockBuffer(IndexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-		FMemory::Memcpy(IndexBufferData, Indices.GetData(), SizeInBytes);
-		RHIUnlockBuffer(IndexBufferRHI);
-		#endif
+		return &LocalVertexFactory;
 	}
 
-	virtual void ReleaseRHI() override
+	uint32 NumVertices() const
 	{
-		IndexBufferRHI.SafeRelease();
-		FIndexBuffer::ReleaseRHI();
+		return PositionBuffer.GetNumVertices();
 	}
 
-	void UpdateBuffer(const TArray<uint16>& NewIndices)
+	uint32 NumIndices() const
 	{
-		ENQUEUE_RENDER_COMMAND(UpdateIndexBuffer)(
-			[this, NewIndices](FRHICommandListImmediate& RHICmdList)
-			{
-				const uint32 SizeInBytes = sizeof(uint16) * NewIndices.Num();
-				void* IndexBufferData = RHICmdList.LockBuffer(IndexBufferRHI, 0, SizeInBytes, RLM_WriteOnly);
-				FMemory::Memcpy(IndexBufferData, NewIndices.GetData(), SizeInBytes);
-				RHICmdList.UnlockBuffer(IndexBufferRHI);
-			}
-		);
+		return IndexBuffer.GetNumIndices();
 	}
 
-public:
-	TArray<uint16> Indices;
-};
-
-/**
- * Vertex factory for a drawable.
- */
-class FCubismDrawableVertexFactory : public FLocalVertexFactory
-{
-public:
-	FCubismDrawableVertexFactory(ERHIFeatureLevel::Type InFeatureLevel, const FCubismDrawableVertexBuffer* InVertexBuffer)
-		: FLocalVertexFactory(InFeatureLevel, "FCubismDrawableVertexFactory")
-		, VertexBuffer(InVertexBuffer)
-	{ }
-
-	#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-	void InitResource(FRHICommandListBase& RHICmdList) override
-	#else
-	void InitResource() override
-	#endif
+	const FCubismUshortIndexBuffer& GetIndexBuffer()
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(FCubismDrawableVertexFactory::InitResource)
-
-		{
-			FDataType LocalData;
-
-			LocalData.NumTexCoords = 1;
-			LocalData.PositionComponentSRV = VertexBuffer->PositionBufferSRV;
-			LocalData.TextureCoordinatesSRV = VertexBuffer->UVBufferSRV;
-			LocalData.TangentsSRV = VertexBuffer->TangentBufferSRV;
-			LocalData.ColorComponentsSRV = VertexBuffer->ColorBufferSRV;
-
-			{
-				LocalData.PositionComponent = FVertexStreamComponent(
-					&VertexBuffer->PositionBuffer,
-					0,
-					sizeof(FVector3f),
-					VET_Float3
-				);
-
-				LocalData.TextureCoordinates.Add(FVertexStreamComponent(
-					&VertexBuffer->UVBuffer,
-					0,
-					sizeof(FVector2f),
-					VET_Float2, 
-					EVertexStreamUsage::ManualFetch
-				));
-			}
-
-			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 4
-			SetData(RHICmdList, LocalData);		
-			#else
-			SetData(LocalData);
-			#endif
-		}
-
-		#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-		FLocalVertexFactory::InitResource(RHICmdList);
-		#else
-		FLocalVertexFactory::InitResource();
-		#endif
+		return IndexBuffer;
 	}
 
 private:
-	const FCubismDrawableVertexBuffer* VertexBuffer;
+	void MakeLocalVertexFactoryData(FLocalVertexFactory::FDataType& Data) const
+	{
+		Data.PositionComponent = FVertexStreamComponent(&PositionBuffer, 0, FCubismVertexBuffer<FVector3f>::Stride, VET_Float3);
+		Data.PositionComponentSRV = PositionBuffer.GetSRV();
+		Data.TextureCoordinates.Reset();
+		Data.TextureCoordinates.Add(FVertexStreamComponent(&UVBuffer, 0, FCubismVertexBuffer<FVector2f>::Stride, VET_Float2));
+		Data.TextureCoordinatesSRV = UVBuffer.GetSRV();
+		Data.TangentsSRV = GNullVertexBuffer.VertexBufferSRV;
+		Data.TangentBasisComponents[0] = FVertexStreamComponent(&TangentXBuffer, 0, FCubismVertexBuffer<FPackedNormal>::Stride, VET_PackedNormal);
+		Data.TangentBasisComponents[1] = FVertexStreamComponent(&TangentZBuffer, 0, FCubismVertexBuffer<FPackedNormal>::Stride, VET_PackedNormal);
+
+		Data.ColorComponentsSRV = GNullColorVertexBuffer.VertexBufferSRV;
+		Data.NumTexCoords = 1;
+	}
+
+	FCubismVertexBuffer<FVector3f> PositionBuffer = {};
+	FCubismVertexBuffer<FVector2f> UVBuffer = {};
+	FCubismVertexBuffer<FPackedNormal> TangentXBuffer = {};
+	FCubismVertexBuffer<FPackedNormal> TangentZBuffer = {};
+
+	FCubismUshortIndexBuffer IndexBuffer = {};
+
+	FLocalVertexFactory LocalVertexFactory;
 };

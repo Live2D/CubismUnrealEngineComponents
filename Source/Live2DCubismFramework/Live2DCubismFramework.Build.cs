@@ -98,12 +98,11 @@ public class Live2DCubismFramework : ModuleRules
 		{
 			string CubismLibPath = Path.Combine(ThirdPartyPath, "Live2DCubismCore" , "lib/macos/x86_64");
 			string CubismDllPath = Path.Combine(ThirdPartyPath, "Live2DCubismCore" , "dll/macos");
-			string DllName = "libLive2DCubismCore.dylib";
+			string DylibName = "libLive2DCubismCore.dylib";
 
 			PublicSystemLibraryPaths.Add(CubismLibPath);
 			PublicAdditionalLibraries.Add(Path.Combine(CubismLibPath, "libLive2DCubismCore.a"));
-			PublicDelayLoadDLLs.Add(DllName);
-			RuntimeDependencies.Add($"$(TargetOutputDir)/{DllName}", Path.Combine(CubismDllPath, DllName));
+			// RuntimeDependencies.Add($"$(TargetOutputDir)/{DylibName}", Path.Combine(CubismDllPath, DylibName));
 		}
 		else if (Target.Platform == UnrealTargetPlatform.Linux)
 		{
@@ -115,6 +114,20 @@ public class Live2DCubismFramework : ModuleRules
 			PublicAdditionalLibraries.Add(Path.Combine(CubismLibPath, "libLive2DCubismCore.a"));
 			PublicDelayLoadDLLs.Add(DllName);
 			RuntimeDependencies.Add($"$(TargetOutputDir)/{DllName}", Path.Combine(CubismDllPath, DllName));
+		}
+		else if (Target.Platform == UnrealTargetPlatform.IOS)
+		{
+			string CubismLibPath = Path.Combine(ThirdPartyPath, "Live2DCubismCore" , "lib/ios/Release-iphoneos");
+
+			PublicSystemLibraryPaths.Add(CubismLibPath);
+			PublicAdditionalLibraries.Add(Path.Combine(CubismLibPath, "libLive2DCubismCore.a"));
+		}
+		else if (Target.Platform == UnrealTargetPlatform.Android)
+		{
+			string CubismLibPath = Path.Combine(ThirdPartyPath, "Live2DCubismCore", "lib/android/arm64-v8a");
+
+			PublicSystemLibraryPaths.Add(CubismLibPath);
+			PublicAdditionalLibraries.Add(Path.Combine(CubismLibPath, "libLive2DCubismCore.a"));
 		}
 	}
 }

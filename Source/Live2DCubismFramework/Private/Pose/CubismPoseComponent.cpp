@@ -93,9 +93,14 @@ void UCubismPoseComponent::Setup(UCubismModelComponent* InModel)
 		}
 		Model->Pose = this;
 	}
-
-	AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
-	AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
+	if (Model && Model->ParameterStore)
+	{
+		AddTickPrerequisiteComponent(Model->ParameterStore); // must be updated after parameters loaded
+	}
+	if (Model && Model->Motion)
+	{
+		AddTickPrerequisiteComponent(Model->Motion); // must be updated at first because motions overwrite parameters
+	}
 }
 
 // UObject interface
@@ -171,6 +176,15 @@ void UCubismPoseComponent::OnComponentCreated()
 
 	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 
 #if WITH_EDITOR
@@ -198,6 +212,15 @@ void UCubismPoseComponent::PostEditUndo()
 
 	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif
@@ -287,7 +310,10 @@ void UCubismPoseComponent::DoFade(float DeltaTime)
 				Part->SetPartOpacity(Opacity);
 			}
 
-			Model->ParameterStore->SavePartOpacity(Part->Index);
+			if (Model && Model->ParameterStore)
+			{
+				Model->ParameterStore->SavePartOpacity(Part->Index);
+			}
 		}
 	}
 }
@@ -309,7 +335,11 @@ void UCubismPoseComponent::CopyPartOpacities()
 			for (const TObjectPtr<UCubismPartComponent>& LinkPart : PartParam.LinkParts)
 			{
 				LinkPart->SetPartOpacity(Opacity);
-				Model->ParameterStore->SavePartOpacity(LinkPart->Index);
+
+				if (Model && Model->ParameterStore)
+				{
+					Model->ParameterStore->SavePartOpacity(LinkPart->Index);
+				}
 			}
 		}
 	}

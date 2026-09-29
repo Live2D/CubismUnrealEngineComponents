@@ -8,11 +8,18 @@
 
 #include "CubismMotion3JsonFactory.h"
 
+#include "CubismImporterUtils.h"
+#include "CubismSourcePathUtils.h"
+
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Motion/CubismMotion3Json.h"
 #include "Motion/CubismMotion3JsonImporter.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
+#include "Misc/Paths.h"
+#include "Modules/ModuleManager.h"
 #include "CubismLog.h"
+#include "UObject/SavePackage.h"
 
 UCubismMotion3JsonFactory::UCubismMotion3JsonFactory()
 {
@@ -47,6 +54,11 @@ UObject* UCubismMotion3JsonFactory::FactoryCreateText
 	FFeedbackContext* Warn
 )
 {
+	if (CubismImporterShouldSuppressDuplicateImport(CurrentFilename, InParent, TEXT("Motion3")))
+	{
+		return nullptr;
+	}
+
 	TObjectPtr<UCubismMotion3Json> Result = nullptr;
 
 	FCubismMotion3JsonImporter Importer;
@@ -58,16 +70,26 @@ UObject* UCubismMotion3JsonFactory::FactoryCreateText
 		
 		Importer.ApplyParams(Flags, Result);
 
+		FString ImportFilename = CurrentFilename;
+		if (!CubismImporterCopySourceToAssetPackageDirectory(CurrentFilename, Result, ImportFilename))
+		{
+			return nullptr;
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(ImportFilename, Result);
+
 		// Update asset import data
 		if (Result->AssetImportData)
 		{
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
 		else
 		{
 			Result->AssetImportData = NewObject<UAssetImportData>(Result, TEXT("AssetImportData"));
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
+
+		Result->CubismStoredSourcePath = StoredImportPath;
 	}
 
 	return Result;
@@ -89,7 +111,15 @@ void UCubismMotion3JsonFactory::SetReimportPaths(UObject* Obj, const TArray<FStr
 	UCubismMotion3Json* Motion = Cast<UCubismMotion3Json>(Obj);
 	if (Motion && ensure(NewReimportPaths.Num() == 1))
 	{
+		if (!Motion->AssetImportData)
+		{
+			Motion->AssetImportData = NewObject<UAssetImportData>(Motion, TEXT("AssetImportData"));
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(NewReimportPaths[0], Motion);
+
 		Motion->AssetImportData->UpdateFilenameOnly(NewReimportPaths[0]);
+		Motion->CubismStoredSourcePath = StoredImportPath;
 	}
 }
 
@@ -101,7 +131,24 @@ EReimportResult::Type UCubismMotion3JsonFactory::Reimport(UObject* Obj)
 		return EReimportResult::Failed;
 	}
 
-	const FString Filename = Motion->AssetImportData->GetFirstFilename();
+	const FString StoredFilename = Motion->AssetImportData
+		? Motion->AssetImportData->GetFirstFilename()
+		: Motion->CubismStoredSourcePath;
+
+	FString Filename = CubismResolveStoredSourcePath(StoredFilename, Motion);
+
+	if (IFileManager::Get().FileSize(*Filename) == INDEX_NONE && CubismIsPluginAsset(Motion))
+	{
+		const FString FallbackFilename = CubismImporterFindPluginLocalSourceFallback(Motion, TEXT(".motion3.json"), true);
+
+		UE_LOG(LogCubism, Warning, TEXT("Motion3 Reimport: Plugin fallback candidate=%s"), *FallbackFilename);
+
+		if (!FallbackFilename.IsEmpty())
+		{
+			Filename = FallbackFilename;
+		}
+	}
+
 	if (!Filename.Len())
 	{
 		return EReimportResult::Failed;
@@ -115,13 +162,39 @@ EReimportResult::Type UCubismMotion3JsonFactory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(Motion->GetClass(), Motion->GetOuter(), *Motion->GetName(), RF_Public, Filename, nullptr, OutCanceled))
+	UObject* ImportedObject = ImportObject(Motion->GetClass(), Motion->GetOuter(), *Motion->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled);
+
+	if (ImportedObject)
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 
-		Motion->AssetImportData->Update(Filename);
+		UCubismMotion3Json* ReimportedMotion = Cast<UCubismMotion3Json>(ImportedObject);
+		if (!ReimportedMotion)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Reimport failed: ImportedObject is not UCubismMotion3Json"));
+			return EReimportResult::Failed;
+		}
 
-		Motion->MarkPackageDirty();
+		if (!ReimportedMotion->AssetImportData)
+		{
+			ReimportedMotion->AssetImportData = NewObject<UAssetImportData>(ReimportedMotion, TEXT("AssetImportData"));
+		}
+
+		ReimportedMotion->Modify();
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(Filename, ReimportedMotion);
+
+		ReimportedMotion->AssetImportData->Update(Filename);
+		ReimportedMotion->CubismStoredSourcePath = StoredImportPath;
+		ReimportedMotion->MarkPackageDirty();
+		CubismImporterUpdateAssetRegistryTags(ReimportedMotion);
+
+#if WITH_EDITOR
+		ReimportedMotion->PostEditChange();
+#endif
+
+		CubismImporterSaveReimportedAssetPackage(ReimportedMotion, TEXT("Motion3"));
+		CubismImporterUpdateAssetRegistryTags(ReimportedMotion);
 
 		return EReimportResult::Succeeded;
 	}

@@ -8,10 +8,17 @@
 
 #include "CubismMoc3Factory.h"
 
+#include "CubismImporterUtils.h"
+#include "CubismSourcePathUtils.h"
+
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Model/CubismMoc3.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "CubismLog.h"
+#include "EditorFramework/AssetImportData.h"
+#include "Misc/Paths.h"
+#include "UObject/SavePackage.h"
 
 UCubismMoc3Factory::UCubismMoc3Factory() 
 {
@@ -55,6 +62,11 @@ UObject* UCubismMoc3Factory::FactoryCreateBinary
 	FFeedbackContext * Warn
 )
 {
+	if (CubismImporterShouldSuppressDuplicateImport(CurrentFilename, InParent, TEXT("Moc3")))
+	{
+		return nullptr;
+	}
+
 	TArray<uint8> Bytes;
 	for (int32 i = 0; i < BufferEnd - Buffer; ++i)
 	{
@@ -65,6 +77,30 @@ UObject* UCubismMoc3Factory::FactoryCreateBinary
 
 	Result->Bytes = Bytes;
 	Result->Setup();
+
+	if (!Result->AssetImportData)
+	{
+		Result->AssetImportData = NewObject<UAssetImportData>(Result, TEXT("AssetImportData"));
+	}
+
+	FString ImportFilename = CurrentFilename;
+	if (!CubismImporterCopySourceToAssetPackageDirectory(CurrentFilename, Result, ImportFilename))
+	{
+		return nullptr;
+	}
+
+	const FString StoredImportPath = CubismMakeStoredSourcePath(ImportFilename, Result);
+
+	UE_LOG(LogCubism, Warning, TEXT("Moc3 FactoryCreateBinary: Current=%s"), *ImportFilename);
+	UE_LOG(LogCubism, Warning, TEXT("Moc3 FactoryCreateBinary: Stored=%s"), *StoredImportPath);
+
+	Result->AssetImportData->Update(ImportFilename);
+	Result->CubismStoredSourcePath = StoredImportPath;
+	UE_LOG(LogCubism, Warning, TEXT("Moc3 FactoryCreateBinary: CubismStoredSourcePath=%s"), *Result->CubismStoredSourcePath);
+
+#if WITH_EDITOR
+	Result->PostEditChange();
+#endif
 
 	return Result;
 }
@@ -85,7 +121,18 @@ void UCubismMoc3Factory::SetReimportPaths(UObject* Obj, const TArray<FString>& N
 	UCubismMoc3* Moc = Cast<UCubismMoc3>(Obj);
 	if (Moc && ensure(NewReimportPaths.Num() == 1))
 	{
+		if (!Moc->AssetImportData)
+		{
+			Moc->AssetImportData = NewObject<UAssetImportData>(Moc, TEXT("AssetImportData"));
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(NewReimportPaths[0], Moc);
+
+		UE_LOG(LogCubism, Warning, TEXT("Moc3 SetReimportPaths: Input=%s"), *NewReimportPaths[0]);
+		UE_LOG(LogCubism, Warning, TEXT("Moc3 SetReimportPaths: Stored=%s"), *StoredImportPath);
+
 		Moc->AssetImportData->UpdateFilenameOnly(NewReimportPaths[0]);
+		Moc->CubismStoredSourcePath = StoredImportPath;
 	}
 }
 
@@ -97,7 +144,24 @@ EReimportResult::Type UCubismMoc3Factory::Reimport(UObject* Obj)
 		return EReimportResult::Failed;
 	}
 
-	const FString Filename = Moc->AssetImportData->GetFirstFilename();
+	const FString StoredFilename = Moc->AssetImportData->GetFirstFilename();
+	FString Filename = CubismResolveStoredSourcePath(StoredFilename, Moc);
+
+	UE_LOG(LogCubism, Warning, TEXT("Moc3 Reimport: Stored=%s"), *StoredFilename);
+	UE_LOG(LogCubism, Warning, TEXT("Moc3 Reimport: Resolved=%s"), *Filename);
+
+	if (IFileManager::Get().FileSize(*Filename) == INDEX_NONE && CubismIsPluginAsset(Moc))
+	{
+		const FString FallbackFilename = CubismImporterFindPluginLocalSourceFallback(Moc, TEXT(".moc3"), false);
+
+		UE_LOG(LogCubism, Warning, TEXT("Moc3 Reimport: Plugin fallback candidate=%s"), *FallbackFilename);
+
+		if (!FallbackFilename.IsEmpty())
+		{
+			Filename = FallbackFilename;
+		}
+	}
+
 	if (!Filename.Len())
 	{
 		return EReimportResult::Failed;
@@ -111,13 +175,50 @@ EReimportResult::Type UCubismMoc3Factory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(Moc->GetClass(), Moc->GetOuter(), *Moc->GetName(), RF_Public, Filename, nullptr, OutCanceled))
+	UObject* ImportedObject = ImportObject(
+		Moc->GetClass(),
+		Moc->GetOuter(),
+		*Moc->GetName(),
+		RF_Public | RF_Standalone,
+		Filename,
+		nullptr,
+		OutCanceled
+	);
+
+	if (ImportedObject)
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 
-		Moc->AssetImportData->Update(Filename);
+		UCubismMoc3* ReimportedMoc = Cast<UCubismMoc3>(ImportedObject);
+		if (!ReimportedMoc)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Reimport failed: ImportedObject is not UCubismMoc3"));
+			return EReimportResult::Failed;
+		}
 
-		Moc->MarkPackageDirty();
+		if (!ReimportedMoc->AssetImportData)
+		{
+			ReimportedMoc->AssetImportData = NewObject<UAssetImportData>(ReimportedMoc, TEXT("AssetImportData"));
+		}
+
+		ReimportedMoc->Modify();
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(Filename, ReimportedMoc);
+		UE_LOG(LogCubism, Warning, TEXT("Moc3 Reimport: Updated stored path=%s"), *StoredImportPath);
+
+		ReimportedMoc->AssetImportData->Update(Filename);
+		ReimportedMoc->CubismStoredSourcePath = StoredImportPath;
+		UE_LOG(LogCubism, Warning, TEXT("Moc3 Reimport: CubismStoredSourcePath=%s"), *ReimportedMoc->CubismStoredSourcePath);
+
+		ReimportedMoc->MarkPackageDirty();
+		CubismImporterUpdateAssetRegistryTags(ReimportedMoc);
+
+#if WITH_EDITOR
+		ReimportedMoc->PostEditChange();
+#endif
+
+		CubismImporterSaveReimportedAssetPackage(ReimportedMoc, TEXT("Moc3"));
+		CubismImporterUpdateAssetRegistryTags(ReimportedMoc);
 
 		return EReimportResult::Succeeded;
 	}
@@ -135,3 +236,4 @@ EReimportResult::Type UCubismMoc3Factory::Reimport(UObject* Obj)
 		}
 	}
 }
+

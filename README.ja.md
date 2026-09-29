@@ -55,20 +55,34 @@ Cubismファイルをuassetファイルに変換する機能は `./Source/Live2D
 
 | Unreal Engine | バージョン |
 | --- | --- |
+| Unreal Editor 5.7 | 5.7.4 |
+| Unreal Editor 5.6 | 5.6.1 |
 | Unreal Editor 5.5 | 5.5.4 |
 | Unreal Editor 5.4 | 5.4.4 |
 | Unreal Editor 5.3 | 5.3.2 |
 
 | ライブラリ / ツール | バージョン |
 | --- | --- |
-| Visual Studio 2022 | 17.14.1 |
-| Windows SDK | 10.0.22621.0 |
+| Visual Studio 2022 | 17.14.40 |
+| Windows SDK | 10.0.26100.0 |
+| Xcode | 26.6 |
+| Android NDK | 30.0.16248370 |
+| Android SDK | 37.0.0 |
+| Android CMake | 4.1.2 |
 
 ## テスト済みの環境
 
 | プラットフォーム | バージョン |
 | --- | --- |
-| Windows 11 | 24H2 |
+| iOS / iPadOS | 26.4 |
+| macOS | 26.6 |
+| Windows 11 | 25H2 |
+
+### Android
+
+| バージョン | デバイス |
+| --- | --- |
+| 16 | Pixel 7a |
 
 
 ## ブランチ

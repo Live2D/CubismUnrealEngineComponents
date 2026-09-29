@@ -62,6 +62,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
 	float Value;
 
+	/**
+	* Whether to override repeat setting for this parameter.
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	bool bOverrideRepeat = false;
+
+	/**
+	* Whether this parameter should repeat (used when override is true).
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Live2D Cubism")
+	bool bRepeat = false;
+
 public:
 	/**
 	 * @brief The function to set up the component.
@@ -94,6 +106,27 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
 	void MultiplyParameterValue(float TargetValue, const float Weight = 1.0f);
+
+	/**
+	* Returns whether this parameter is set to repeat.
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	bool IsRepeat() const;
+
+	/**
+	* Returns a wrapped (repeat) value based on parameter limits.
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	float GetParameterRepeatValue(float InValue) const;
+
+	/**
+	* Returns a clamped value based on parameter limits.
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	float GetParameterClampValue(float InValue) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Live2D Cubism")
+	void OverrideValue(float InValue, float Weight = 1.0f);
 
 private:
 	friend class UCubismModelComponent;

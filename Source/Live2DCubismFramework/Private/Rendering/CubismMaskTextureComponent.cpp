@@ -11,10 +11,11 @@
 #include "Model/CubismDrawableComponent.h"
 #include "Rendering/CubismRendererComponent.h"
 #include "Rendering/CubismMaskJunction.h"
-#include "Rendering/CubismMaskShaders.h"
+#include "Rendering/CubismMaskRenderer.h"
 #include "Engine/Texture2D.h"
 #include "CubismLog.h"
-#include <math.h>
+#include "Engine/World.h"
+#include "SceneInterface.h"
 
 UCubismMaskTextureComponent::UCubismMaskTextureComponent()
 {
@@ -281,7 +282,7 @@ void UCubismMaskTextureComponent::TickComponent(float DeltaTime, ELevelTick Tick
 			continue;
 		}
 
-		TArray<FMaskDrawInfo> MaskDrawInfos;
+		TArray<FCubismMaskRenderer::FDrawableInfo> MaskDrawableInfoArray;
 
 		for (const TObjectPtr<ACubismModel>& ModelActor : Models)
 		{
@@ -300,56 +301,61 @@ void UCubismMaskTextureComponent::TickComponent(float DeltaTime, ELevelTick Tick
 					continue;
 				}
 
-				for (const TObjectPtr<UCubismDrawableComponent>& MaskDrawable : Junction->MaskDrawables)
+				for (const FCubismMaskJunction::FMaskDrawableData& MaskDrawable : Junction->MaskDrawables)
 				{
+					const TObjectPtr<UCubismDrawableComponent>& DrawableData = MaskDrawable.Drawable;
+
 					// If the texture does not exist, skip drawing the mask. 
-					if (MaskDrawable->TextureIndex >= Textures.Num())
+					if (DrawableData->TextureIndex >= Textures.Num())
 					{
 						continue;
 					}
 
-					const TObjectPtr<UTexture2D>& Texture = Textures[MaskDrawable->TextureIndex];
+					const TObjectPtr<UTexture2D>& Texture = Textures[DrawableData->TextureIndex];
 
 					if (!Texture)
 					{
 						continue;
 					}
 
-					const TArray<int32>& Indices = MaskDrawable->GetVertexIndices();
-					const TArray<FVector2D>& Positions = MaskDrawable->GetVertexPositions();
-					const TArray<FVector2D>& UVs = MaskDrawable->GetVertexUvs();
+					const TArray<int32>& Indices = DrawableData->GetVertexIndices();
+					const TArray<FVector2D>& Positions = DrawableData->GetVertexPositions();
+					const TArray<FVector2D>& UVs = DrawableData->GetVertexUvs();
 
-					FMaskDrawInfo DrawInfo;
+					FCubismMaskRenderer::FDrawableInfo MaskDrawableInfo;
 
 					for (int32 i = 0; i < Indices.Num(); ++i)
 					{
-						DrawInfo.Indices.Add((uint16)Indices[i]);
+						MaskDrawableInfo.Indices.Add((uint16)Indices[i]);
 					}
 					for (int32 i = 0; i < Positions.Num(); ++i)
 					{
-						FCubismMeshMaskVertex Vertex;
+						FCubismMaskRenderer::FMeshVertexData Vertex;
 
-						Vertex.Position = (FVector2f)Positions[i];
-						Vertex.UV = (FVector2f)UVs[i];
+						Vertex.Position = static_cast<FVector2f>(Positions[i]);
+						Vertex.UV = static_cast<FVector2f>(UVs[i]);
 
-						DrawInfo.Vertices.Add(Vertex);
+						MaskDrawableInfo.Vertices.Add(Vertex);
 					}
-					DrawInfo.Offset = Junction->Offset;
-					DrawInfo.Channel = Junction->Channel;
-					DrawInfo.MainTexture = Texture->GetResource();
+					MaskDrawableInfo.Offset = Junction->Offset;
+					MaskDrawableInfo.Channel = Junction->Channel;
+					MaskDrawableInfo.MainTexture = Texture->GetResource();
+					MaskDrawableInfo.Renderer = MaskDrawable.Renderer.Get();
 
-					MaskDrawInfos.Add(DrawInfo);
+					MaskDrawableInfoArray.Add(MaskDrawableInfo);
 				}
 			}
 		}
 
 		FTextureRenderTargetResource* RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
 
+		ERHIFeatureLevel::Type FeatureLevel = GetWorld()->Scene->GetFeatureLevel();
+
 		// Draw the mask to the render target.
 		ENQUEUE_RENDER_COMMAND(DrawMaskCommand)(
-			[this, RenderTargetResource, MaskDrawInfos](FRHICommandList& RHICmdList)
+			[this, RenderTargetResource, MaskDrawableInfoArray, FeatureLevel](FRHICommandList& RHICmdList)
 			{
-				DrawCubismMeshMask_RenderThread(RHICmdList, RenderTargetResource, MaskDrawInfos);
+				FCubismMaskRenderer::DrawMeshes_RenderThread(RHICmdList, RenderTargetResource, MaskDrawableInfoArray, FeatureLevel);
 			}
 		);
 	}

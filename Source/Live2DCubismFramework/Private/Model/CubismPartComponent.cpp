@@ -25,7 +25,10 @@ void UCubismPartComponent::Setup(UCubismModelComponent* InModel)
 		return;
 	}
 
-	check(Index >= 0 && Index < InModel->GetPartCount() || InModel->NonNativePartIds.Contains(Index));
+	if ((Index < 0 || Index >= InModel->GetPartCount()) && !InModel->NonNativePartIds.Contains(Index))
+	{
+		return;
+	}
 
 	if (Model == InModel)
 	{
@@ -51,8 +54,10 @@ void UCubismPartComponent::Setup(UCubismModelComponent* InModel)
 void UCubismPartComponent::SetPartOpacity(float TargetOpacity)
 {
 	Opacity = TargetOpacity;
-
-	Model->SetPartOpacity(Index, Opacity);
+	if (Model)
+	{
+		Model->SetPartOpacity(Index, Opacity);
+	}
 }
 
 // UObject interface
@@ -62,6 +67,15 @@ void UCubismPartComponent::PostLoad()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -74,6 +88,10 @@ void UCubismPartComponent::PostEditChangeProperty(FPropertyChangedEvent& Propert
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismPartComponent, Opacity))
 	{
+		if (!Model)
+		{
+			return;
+		}
 		Model->SetPartOpacity(Index, Opacity);
 
 		if(Model->ParameterStore)
@@ -92,6 +110,15 @@ void UCubismPartComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -102,6 +129,15 @@ void UCubismPartComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif

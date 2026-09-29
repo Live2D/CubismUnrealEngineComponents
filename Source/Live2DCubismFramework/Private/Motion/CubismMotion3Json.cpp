@@ -8,6 +8,10 @@
 
 #include "Motion/CubismMotion3Json.h"
 
+#include "CubismSourcePathUtils.h"
+#include "CubismLog.h"
+#include "Misc/Paths.h"
+
 void UCubismMotion3Json::PostInitProperties()
 {
 #if WITH_EDITORONLY_DATA
@@ -17,6 +21,18 @@ void UCubismMotion3Json::PostInitProperties()
 	}
 #endif
 	Super::PostInitProperties();
+}
+
+void UCubismMotion3Json::PostLoad()
+{
+	Super::PostLoad();
+
+#if WITH_EDITORONLY_DATA
+	if (CubismRepairStoredSourcePath(AssetImportData, this, CubismStoredSourcePath))
+	{
+		MarkPackageDirty();
+	}
+#endif
 }
 
 #if WITH_EDITORONLY_DATA

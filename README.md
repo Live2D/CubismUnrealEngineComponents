@@ -55,20 +55,34 @@ Resources like shaders and other assets are located in `./Content/Materials`.
 
 | Unreal Engine | Version |
 | --- | --- |
+| Unreal Editor 5.7 | 5.7.4 |
+| Unreal Editor 5.6 | 5.6.1 |
 | Unreal Editor 5.5 | 5.5.4 |
 | Unreal Editor 5.4 | 5.4.4 |
 | Unreal Editor 5.3 | 5.3.2 |
 
 | Library / Tool | Version |
 | --- | --- |
-| Visual Studio 2022 | 17.14.1 |
-| Windows SDK | 10.0.22621.0 |
+| Visual Studio 2022 | 17.14.40 |
+| Windows SDK | 10.0.26100.0 |
+| Xcode | 26.6 |
+| Android NDK | 30.0.16248370 |
+| Android SDK | 37.0.0 |
+| Android CMake | 4.1.2 |
 
 ## Tested environment
 
 | Platform | Version |
 | --- | --- |
-| Windows 11 | 24H2 |
+| iOS / iPadOS | 26.4 |
+| macOS | 26.6 |
+| Windows 11 | 25H2 |
+
+### Android
+
+| Version | Device |
+| --- | --- |
+| 16 | Pixel 7a |
 
 ## Branches
 
@@ -83,7 +97,7 @@ For more details, please refer to the [official manual](https://docs.live2d.com/
 
 ## Contributing
 
-There are many ways to contribute to the project: logging bugs, submitting pull requests on this GitHub, and reporting issues and making suggestions in Live2D CommUnreal Engine.
+There are many ways to contribute to the project: logging bugs, submitting pull requests on this GitHub, and reporting issues and making suggestions in Live2D Community.
 
 ### Forking And Pull Requests
 
@@ -91,11 +105,11 @@ We very much appreciate your pull requests, whether they bring fixes, improvemen
 
 ### Bugs
 
-We are regularly checking issue-reports and feature requests at Live2D CommUnreal Engine. Before filing a bug report, please do a search in Live2D CommUnreal Engine to see if the issue-report or feature request has already been posted. If you find your issue already exists, make relevant comments and add your reaction.
+We are regularly checking issue-reports and feature requests at Live2D Community. Before filing a bug report, please do a search in Live2D Community to see if the issue-report or feature request has already been posted. If you find your issue already exists, make relevant comments and add your reaction.
 
 ### Suggestions
 
-We're also interested in your feedback for the future of the SDK. You can submit a suggestion or feature request at Live2D CommUnreal Engine. To make this process more effective, we're asking that you include more information to help define them more clearly.
+We're also interested in your feedback for the future of the SDK. You can submit a suggestion or feature request at Live2D Community. To make this process more effective, we're asking that you include more information to help define them more clearly.
 
 ## Coding Guidelines
 

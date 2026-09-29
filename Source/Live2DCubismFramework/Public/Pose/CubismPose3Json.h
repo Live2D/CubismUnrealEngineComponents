@@ -75,8 +75,15 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pose Data")
 	TArray<FCubismPosePartGroup> PartGroups;
 
+	/**
+	 * The stored path to the source file used for Cubism reimport.
+	 */
+	UPROPERTY(VisibleAnywhere, Category = ImportSettings, meta = (DisplayName = "Cubism Stored Source Path"))
+	FString CubismStoredSourcePath;
+
 	// UObject interface
 	virtual void PostInitProperties() override;
+	virtual void PostLoad() override;
 	// End of UObject interface
 
 #if WITH_EDITORONLY_DATA

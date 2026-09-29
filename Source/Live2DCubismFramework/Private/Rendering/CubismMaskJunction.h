@@ -10,6 +10,7 @@
 
 #include "Rendering/CubismMaskTextureComponent.h"
 
+class FCubismMaskRenderer;
 class UCubismDrawableComponent;
 class UTextureRenderTarget2D;
 
@@ -19,6 +20,19 @@ class UTextureRenderTarget2D;
 class FCubismMaskJunction
 {
 public:
+	struct FMaskDrawableData
+	{
+		/**
+		 * The list of the drawables for masking.
+		 */
+		TObjectPtr<UCubismDrawableComponent> Drawable;
+
+		/**
+		 * The list of the buffers for masking.
+		 */
+		TUniquePtr<FCubismMaskRenderer> Renderer;
+	};
+
 	/**
 	 * The list of the drawables that use the same mask.
 	 */
@@ -27,7 +41,7 @@ public:
 	/**
 	 * The list of the drawables for masking.
 	 */
-	TArray<TObjectPtr<UCubismDrawableComponent>> MaskDrawables;
+	TArray<FMaskDrawableData> MaskDrawables;
 
 	/**
 	 * The render target where the mask is drawn.

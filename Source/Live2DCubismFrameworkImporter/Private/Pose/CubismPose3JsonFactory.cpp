@@ -8,11 +8,18 @@
 
 #include "CubismPose3JsonFactory.h"
 
+#include "CubismImporterUtils.h"
+#include "CubismSourcePathUtils.h"
+
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Pose/CubismPose3Json.h"
 #include "Pose/CubismPose3JsonImporter.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
+#include "Misc/Paths.h"
+#include "Modules/ModuleManager.h"
 #include "CubismLog.h"
+#include "UObject/SavePackage.h"
 
 UCubismPose3JsonFactory::UCubismPose3JsonFactory() 
 {
@@ -47,6 +54,11 @@ UObject* UCubismPose3JsonFactory::FactoryCreateText
 	FFeedbackContext* Warn
 )
 {
+	if (CubismImporterShouldSuppressDuplicateImport(CurrentFilename, InParent, TEXT("Pose3")))
+	{
+		return nullptr;
+	}
+
 	TObjectPtr<UCubismPose3Json> Result = nullptr;
 
 	FCubismPose3JsonImporter Importer;
@@ -58,16 +70,26 @@ UObject* UCubismPose3JsonFactory::FactoryCreateText
 		
 		Importer.ApplyParams(Flags, Result);
 
+		FString ImportFilename = CurrentFilename;
+		if (!CubismImporterCopySourceToAssetPackageDirectory(CurrentFilename, Result, ImportFilename))
+		{
+			return nullptr;
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(ImportFilename, Result);
+
 		// Update asset import data
 		if (Result->AssetImportData)
 		{
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
 		else
 		{
 			Result->AssetImportData = NewObject<UAssetImportData>(Result, TEXT("AssetImportData"));
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
+
+		Result->CubismStoredSourcePath = StoredImportPath;
 	}
 
 	return Result;
@@ -89,7 +111,15 @@ void UCubismPose3JsonFactory::SetReimportPaths(UObject* Obj, const TArray<FStrin
 	UCubismPose3Json* Pose = Cast<UCubismPose3Json>(Obj);
 	if (Pose && ensure(NewReimportPaths.Num() == 1))
 	{
+		if (!Pose->AssetImportData)
+		{
+			Pose->AssetImportData = NewObject<UAssetImportData>(Pose, TEXT("AssetImportData"));
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(NewReimportPaths[0], Pose);
+
 		Pose->AssetImportData->UpdateFilenameOnly(NewReimportPaths[0]);
+		Pose->CubismStoredSourcePath = StoredImportPath;
 	}
 }
 
@@ -101,7 +131,24 @@ EReimportResult::Type UCubismPose3JsonFactory::Reimport(UObject* Obj)
 		return EReimportResult::Failed;
 	}
 
-	const FString Filename = Pose->AssetImportData->GetFirstFilename();
+	const FString StoredFilename = Pose->AssetImportData
+		? Pose->AssetImportData->GetFirstFilename()
+		: Pose->CubismStoredSourcePath;
+
+	FString Filename = CubismResolveStoredSourcePath(StoredFilename, Pose);
+
+	if (IFileManager::Get().FileSize(*Filename) == INDEX_NONE && CubismIsPluginAsset(Pose))
+	{
+		const FString FallbackFilename = CubismImporterFindPluginLocalSourceFallback(Pose, TEXT(".pose3.json"), true);
+
+		UE_LOG(LogCubism, Warning, TEXT("Pose3 Reimport: Plugin fallback candidate=%s"), *FallbackFilename);
+
+		if (!FallbackFilename.IsEmpty())
+		{
+			Filename = FallbackFilename;
+		}
+	}
+
 	if (!Filename.Len())
 	{
 		return EReimportResult::Failed;
@@ -115,13 +162,39 @@ EReimportResult::Type UCubismPose3JsonFactory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(Pose->GetClass(), Pose->GetOuter(), *Pose->GetName(), RF_Public, Filename, nullptr, OutCanceled))
+	UObject* ImportedObject = ImportObject(Pose->GetClass(), Pose->GetOuter(), *Pose->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled);
+
+	if (ImportedObject)
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 
-		Pose->AssetImportData->Update(Filename);
+		UCubismPose3Json* ReimportedPose = Cast<UCubismPose3Json>(ImportedObject);
+		if (!ReimportedPose)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Reimport failed: ImportedObject is not UCubismPose3Json"));
+			return EReimportResult::Failed;
+		}
 
-		Pose->MarkPackageDirty();
+		if (!ReimportedPose->AssetImportData)
+		{
+			ReimportedPose->AssetImportData = NewObject<UAssetImportData>(ReimportedPose, TEXT("AssetImportData"));
+		}
+
+		ReimportedPose->Modify();
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(Filename, ReimportedPose);
+
+		ReimportedPose->AssetImportData->Update(Filename);
+		ReimportedPose->CubismStoredSourcePath = StoredImportPath;
+		ReimportedPose->MarkPackageDirty();
+		CubismImporterUpdateAssetRegistryTags(ReimportedPose);
+
+#if WITH_EDITOR
+		ReimportedPose->PostEditChange();
+#endif
+
+		CubismImporterSaveReimportedAssetPackage(ReimportedPose, TEXT("Pose3"));
+		CubismImporterUpdateAssetRegistryTags(ReimportedPose);
 
 		return EReimportResult::Succeeded;
 	}

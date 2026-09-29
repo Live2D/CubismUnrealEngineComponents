@@ -69,6 +69,11 @@ void UCubismRaycastComponent::Raycast(
 {
 	Result.Empty();
 
+	if (!Model)
+	{
+		return;
+	}
+
 	const FVector NormDir = Direction.GetSafeNormal();
 
 	for (const FCubismRaycastParameter& Parameter : Parameters)
@@ -263,6 +268,15 @@ void UCubismRaycastComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 
@@ -283,6 +297,15 @@ void UCubismRaycastComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif

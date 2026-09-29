@@ -254,6 +254,11 @@ private:
 	 */
 	bool bUserTwoSided;
 
+	/**
+	 * Resource Guard for GT<->RT transferring.
+	 */
+	FRWLock  DynamicDataGuard = {};
+
 public:
 	//Begin USceneComponent Interface
 	virtual FBoxSphereBounds CalcBounds(const FTransform& LocalToWorld) const override;

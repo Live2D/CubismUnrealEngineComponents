@@ -8,11 +8,18 @@
 
 #include "CubismUserData3JsonFactory.h"
 
+#include "CubismImporterUtils.h"
+#include "CubismSourcePathUtils.h"
+
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "UserData/CubismUserData3Json.h"
 #include "UserData/CubismUserData3JsonImporter.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
+#include "Misc/Paths.h"
+#include "Modules/ModuleManager.h"
 #include "CubismLog.h"
+#include "UObject/SavePackage.h"
 
 UCubismUserData3JsonFactory::UCubismUserData3JsonFactory() 
 {
@@ -48,6 +55,11 @@ UObject* UCubismUserData3JsonFactory::FactoryCreateText
 	FFeedbackContext* Warn
 )
 {
+	if (CubismImporterShouldSuppressDuplicateImport(CurrentFilename, InParent, TEXT("UserData3")))
+	{
+		return nullptr;
+	}
+
 	TObjectPtr<UCubismUserData3Json> Result = nullptr;
 
 	FCubismUserData3JsonImporter Importer;
@@ -59,16 +71,26 @@ UObject* UCubismUserData3JsonFactory::FactoryCreateText
 		
 		Importer.ApplyParams(Flags, Result);
 
+		FString ImportFilename = CurrentFilename;
+		if (!CubismImporterCopySourceToAssetPackageDirectory(CurrentFilename, Result, ImportFilename))
+		{
+			return nullptr;
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(ImportFilename, Result);
+
 		// Update asset import data
 		if (Result->AssetImportData)
 		{
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
 		else
 		{
 			Result->AssetImportData = NewObject<UAssetImportData>(Result, TEXT("AssetImportData"));
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
+
+		Result->CubismStoredSourcePath = StoredImportPath;
 	}
 
 	return Result;
@@ -90,7 +112,15 @@ void UCubismUserData3JsonFactory::SetReimportPaths(UObject* Obj, const TArray<FS
 	UCubismUserData3Json* UserData = Cast<UCubismUserData3Json>(Obj);
 	if (UserData && ensure(NewReimportPaths.Num() == 1))
 	{
+		if (!UserData->AssetImportData)
+		{
+			UserData->AssetImportData = NewObject<UAssetImportData>(UserData, TEXT("AssetImportData"));
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(NewReimportPaths[0], UserData);
+
 		UserData->AssetImportData->UpdateFilenameOnly(NewReimportPaths[0]);
+		UserData->CubismStoredSourcePath = StoredImportPath;
 	}
 }
 
@@ -102,7 +132,24 @@ EReimportResult::Type UCubismUserData3JsonFactory::Reimport(UObject* Obj)
 		return EReimportResult::Failed;
 	}
 
-	const FString Filename = UserData->AssetImportData->GetFirstFilename();
+	const FString StoredFilename = UserData->AssetImportData
+		? UserData->AssetImportData->GetFirstFilename()
+		: UserData->CubismStoredSourcePath;
+
+	FString Filename = CubismResolveStoredSourcePath(StoredFilename, UserData);
+
+	if (IFileManager::Get().FileSize(*Filename) == INDEX_NONE && CubismIsPluginAsset(UserData))
+	{
+		const FString FallbackFilename = CubismImporterFindPluginLocalSourceFallback(UserData, TEXT(".userdata3.json"), true);
+
+		UE_LOG(LogCubism, Warning, TEXT("UserData3 Reimport: Plugin fallback candidate=%s"), *FallbackFilename);
+
+		if (!FallbackFilename.IsEmpty())
+		{
+			Filename = FallbackFilename;
+		}
+	}
+
 	if (!Filename.Len())
 	{
 		return EReimportResult::Failed;
@@ -116,13 +163,39 @@ EReimportResult::Type UCubismUserData3JsonFactory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(UserData->GetClass(), UserData->GetOuter(), *UserData->GetName(), RF_Public, Filename, nullptr, OutCanceled))
+	UObject* ImportedObject = ImportObject(UserData->GetClass(), UserData->GetOuter(), *UserData->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled);
+
+	if (ImportedObject)
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 
-		UserData->AssetImportData->Update(Filename);
+		UCubismUserData3Json* ReimportedUserData = Cast<UCubismUserData3Json>(ImportedObject);
+		if (!ReimportedUserData)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Reimport failed: ImportedObject is not UCubismUserData3Json"));
+			return EReimportResult::Failed;
+		}
 
-		UserData->MarkPackageDirty();
+		if (!ReimportedUserData->AssetImportData)
+		{
+			ReimportedUserData->AssetImportData = NewObject<UAssetImportData>(ReimportedUserData, TEXT("AssetImportData"));
+		}
+
+		ReimportedUserData->Modify();
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(Filename, ReimportedUserData);
+
+		ReimportedUserData->AssetImportData->Update(Filename);
+		ReimportedUserData->CubismStoredSourcePath = StoredImportPath;
+		ReimportedUserData->MarkPackageDirty();
+		CubismImporterUpdateAssetRegistryTags(ReimportedUserData);
+
+#if WITH_EDITOR
+		ReimportedUserData->PostEditChange();
+#endif
+
+		CubismImporterSaveReimportedAssetPackage(ReimportedUserData, TEXT("UserData3"));
+		CubismImporterUpdateAssetRegistryTags(ReimportedUserData);
 
 		return EReimportResult::Succeeded;
 	}

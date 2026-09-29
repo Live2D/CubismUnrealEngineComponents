@@ -6,8 +6,6 @@
  */
 
 
-#pragma once
-
 #include "CubismModelParameterControllerCommands.h"
 
 #include "CubismModelParameterControllerWindow.h"

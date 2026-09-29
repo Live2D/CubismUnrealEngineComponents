@@ -46,6 +46,13 @@ public class Live2DCubismFrameworkImporter : ModuleRules
 				"UnrealEd",
 				"AssetDefinition",
 				"Live2DCubismFramework",
+				"ContentBrowser",
+				"Slate",
+				"SlateCore",
+				"ApplicationCore",
+				"AssetTools",
+				"AssetRegistry",
+				"DesktopPlatform"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

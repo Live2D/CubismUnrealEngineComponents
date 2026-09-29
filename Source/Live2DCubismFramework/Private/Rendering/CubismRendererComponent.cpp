@@ -8,6 +8,7 @@
 
 #include "Rendering/CubismRendererComponent.h"
 
+#include "CubismMaskRenderer.h"
 #include "CubismUpdateExecutionOrder.h"
 #include "Model/CubismDrawableComponent.h"
 #include "Model/CubismPartComponent.h"
@@ -16,12 +17,12 @@
 #include "Rendering/CubismMaskTexture.h"
 #include "Rendering/CubismMaskTextureComponent.h"
 #include "Rendering/CubismMaskJunction.h"
-#include "Rendering/CubismShaders.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/Texture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "SceneInterface.h"
 
 UCubismRendererComponent::UCubismRendererComponent()
 {
@@ -57,7 +58,7 @@ void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 				for (int32 i = 0, num = Drawable->Masks.Num(); bAny && i < num; i++)
 				{
 					const int32 MaskDrawableIndex = Drawable->Masks[i];
-					bAny &= Junction->MaskDrawables[i] == Model->Drawables[MaskDrawableIndex];
+					bAny &= Junction->MaskDrawables[i].Drawable == Model->Drawables[MaskDrawableIndex];
 				}
 
 				if (bAny)
@@ -77,8 +78,12 @@ void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 				TargetJunction->MaskDrawables.Reserve(Drawable->Masks.Num());
 				for (const int32 MaskDrawableIndex : Drawable->Masks)
 				{
-					const TObjectPtr<UCubismDrawableComponent>& MaskDrawable = Model->Drawables[MaskDrawableIndex];
-					TargetJunction->MaskDrawables.Add(MaskDrawable);
+					const TObjectPtr<UCubismDrawableComponent>& DrawableData = Model->Drawables[MaskDrawableIndex];
+					TUniquePtr<FCubismMaskRenderer> MaskRenderer = MakeUnique<FCubismMaskRenderer>(DrawableData->GetVertexPositions().Num(), DrawableData->GetVertexIndices().Num());
+
+					FCubismMaskJunction::FMaskDrawableData MaskDrawable{ .Drawable = DrawableData, .Renderer = MoveTemp(MaskRenderer) };
+
+					TargetJunction->MaskDrawables.Add(MoveTemp(MaskDrawable));
 				}
 
 				NumMasks++;
@@ -118,9 +123,13 @@ void UCubismRendererComponent::Setup(UCubismModelComponent* InModel)
 	if (MaskTexture)
 	{
 		ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
-		MaskTexture->MaskTextureComponent->AddModel(Owner);
-		MaskTexture->MaskTextureComponent->ResolveMaskLayout();
-		AddTickPrerequisiteComponent(MaskTexture->MaskTextureComponent); // must render after mask texture updated
+
+		if (Owner && MaskTexture->MaskTextureComponent)
+		{
+			MaskTexture->MaskTextureComponent->AddModel(Owner);
+			MaskTexture->MaskTextureComponent->ResolveMaskLayout();
+			AddTickPrerequisiteComponent(MaskTexture->MaskTextureComponent); // must render after mask texture updated
+		}
 	}
 
 	AddTickPrerequisiteComponent(Model); // must render after model updated
@@ -174,6 +183,11 @@ void UCubismRendererComponent::PostEditChangeProperty(FPropertyChangedEvent& Pro
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
+	if (!Model)
+	{
+		return;
+	}
+
 	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismRendererComponent, MaskTexture))
@@ -182,7 +196,10 @@ void UCubismRendererComponent::PostEditChangeProperty(FPropertyChangedEvent& Pro
 		{
 			ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
-			MaskTexture->MaskTextureComponent->AddModel(Owner);
+			if (Owner && MaskTexture->MaskTextureComponent)
+			{
+				MaskTexture->MaskTextureComponent->AddModel(Owner);
+			}
 		}
 	}
 
@@ -218,6 +235,16 @@ void UCubismRendererComponent::OnComponentCreated()
 	Super::OnComponentCreated();
 
 	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
+
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 
 	if (MaskTexture == nullptr)
 	{
@@ -273,6 +300,15 @@ void UCubismRendererComponent::PostEditUndo()
 
 	ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif
@@ -297,18 +333,16 @@ void UCubismRendererComponent::OnCubismUpdate(float DeltaTime)
 		return;
 	}
 
-	TArray<FDrawInfo> DrawInfos;
-
 	for (const TSharedPtr<FCubismMaskJunction>& Junction : Junctions)
 	{
-		for (const TObjectPtr<UCubismDrawableComponent>& Drawable : Junction->Drawables)
+		for (const TObjectPtr<UCubismDrawableComponent>& MaskJunctionDrawable : Junction->Drawables)
 		{
-			UMaterialInstanceDynamic* MaterialInstance = static_cast<UMaterialInstanceDynamic*>(Drawable->GetMaterial(0));
+			UMaterialInstanceDynamic* MaterialInstance = static_cast<UMaterialInstanceDynamic*>(MaskJunctionDrawable->GetMaterial(0));
 
-			const TObjectPtr<UTexture2D>& MainTexture   = Drawable->TextureIndex < Model->Textures.Num()? Model->Textures[Drawable->TextureIndex] : nullptr;
-			FLinearColor BaseColor     = Drawable->BaseColor;
-			FLinearColor MultiplyColor = Drawable->MultiplyColor;
-			FLinearColor ScreenColor   = Drawable->ScreenColor;
+			const TObjectPtr<UTexture2D>& MainTexture   = MaskJunctionDrawable->TextureIndex < Model->Textures.Num()? Model->Textures[MaskJunctionDrawable->TextureIndex] : nullptr;
+			FLinearColor BaseColor     = MaskJunctionDrawable->BaseColor;
+			FLinearColor MultiplyColor = MaskJunctionDrawable->MultiplyColor;
+			FLinearColor ScreenColor   = MaskJunctionDrawable->ScreenColor;
 
 			{
 				if (Model->bOverwriteFlagForModelMultiplyColors)
@@ -322,7 +356,7 @@ void UCubismRendererComponent::OnCubismUpdate(float DeltaTime)
 				}
 			}
 
-			if (const UCubismPartComponent* ParentPart = Model->GetPart(Drawable->ParentPartIndex))
+			if (const UCubismPartComponent* ParentPart = Model->GetPart(MaskJunctionDrawable->ParentPartIndex))
 			{
 				if (ParentPart->bOverwriteFlagForPartMultiplyColors)
 				{
@@ -335,84 +369,20 @@ void UCubismRendererComponent::OnCubismUpdate(float DeltaTime)
 				}
 			}
 
-			BaseColor.A *= Model->Opacity * Drawable->Opacity;
+			BaseColor.A *= Model->Opacity * MaskJunctionDrawable->Opacity;
 
 			MaterialInstance->SetTextureParameterValue("MainTexture", MainTexture);
 			MaterialInstance->SetVectorParameterValue("BaseColor", BaseColor);
 			MaterialInstance->SetVectorParameterValue("MultiplyColor", MultiplyColor);
 			MaterialInstance->SetVectorParameterValue("ScreenColor", ScreenColor);
 
-			if (Drawable->IsMasked())
+			if (MaskJunctionDrawable->IsMasked())
 			{
 				MaterialInstance->SetTextureParameterValue("MaskTexture", Junction->RenderTarget);
 				MaterialInstance->SetVectorParameterValue("Offset", Junction->Offset);
 				MaterialInstance->SetVectorParameterValue("Channel", Junction->Channel);
 			}
-
-			if (Model->RenderTarget)
-			{
-				const TArray<int32>& Indices = Drawable->GetVertexIndices();
-				const TArray<FVector2D>& Positions = Drawable->GetVertexPositions();
-				const TArray<FVector2D>& UVs = Drawable->GetVertexUvs();
-
-				FDrawInfo DrawInfo;
-
-				DrawInfo.BlendMode = Drawable->BlendMode;
-				DrawInfo.RenderOrder = CalcRenderOrder(Drawable);
-
-				for (int32 i = 0; i < Indices.Num(); ++i)
-				{
-					DrawInfo.Indices.Add((uint16)Indices[i]);
-				}
-
-				for (int32 i = 0; i < Positions.Num(); ++i)
-				{
-					FCubismMeshVertex Vertex;
-
-					Vertex.Position = (FVector2f)Positions[i];
-					Vertex.UV = (FVector2f)UVs[i];
-
-					DrawInfo.Vertices.Add(Vertex);
-				}
-
-				DrawInfo.MainTexture = MainTexture->GetResource();
-
-				DrawInfo.BaseColor = FVector4f(BaseColor);
-				DrawInfo.MultiplyColor = FVector4f(MultiplyColor);
-				DrawInfo.ScreenColor = FVector4f(ScreenColor);
-
-				DrawInfo.IsMasked = Drawable->IsMasked();
-
-				if (Drawable->IsMasked())
-				{
-					DrawInfo.InvertedMask = Drawable->InvertedMask;
-					DrawInfo.MaskTexture = Junction->RenderTarget->GetResource();
-					DrawInfo.Offset = FVector4f(Junction->Offset);
-					DrawInfo.Channel = FVector4f(Junction->Channel);
-				}
-
-				DrawInfos.Add(DrawInfo);
-			}
 		}
-	}
-
-	if (Model->RenderTarget)
-	{
-		FTextureRenderTargetResource* RenderTargetResource = Model->RenderTarget->GameThread_GetRenderTargetResource();
-
-		// sort by render order
-		DrawInfos.Sort([](const FDrawInfo& A, const FDrawInfo& B)
-		{
-			return A.RenderOrder < B.RenderOrder;
-		});
-
-		// Draw the mask to the render target.
-		ENQUEUE_RENDER_COMMAND(DrawCommand)(
-			[this, RenderTargetResource, DrawInfos](FRHICommandList& RHICmdList)
-			{
-				DrawCubismMesh_RenderThread(RHICmdList, RenderTargetResource, DrawInfos);
-			}
-		);
 	}
 }
 

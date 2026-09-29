@@ -152,7 +152,7 @@ private:
 	 * @brief The function to update the motion.
 	 * @param Motion The motion to update.
 	 */
-	void UpdateMotion(float UserTimeSeconds, float FadeWeight, const TSharedPtr<FCubismMotion>& CubismMotion);
+	void UpdateMotion(float UserTimeSeconds, const TSharedPtr<FCubismMotion>& CubismMotion);
 
 public:
 	// UObject interface

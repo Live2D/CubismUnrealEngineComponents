@@ -83,6 +83,10 @@ void UCubismEyeBlinkComponent::PostEditChangeProperty(FPropertyChangedEvent& Pro
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCubismEyeBlinkComponent, Value))
 	{
+		if (!Model)
+		{
+			return;
+		}
 		for (const FString& Id : Ids)
 		{
 			UCubismParameterComponent* Destination = Model->GetParameter(Id);
@@ -142,6 +146,15 @@ void UCubismEyeBlinkComponent::OnComponentCreated()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 
 #if WITH_EDITOR
@@ -169,6 +182,15 @@ void UCubismEyeBlinkComponent::PostEditUndo()
 
 	const ACubismModel* Owner = Cast<ACubismModel>(GetOwner());
 
+	if (!Owner)
+	{
+		return;
+	}
+
+	if (!Owner->Model)
+	{
+		return;
+	}
 	Setup(Owner->Model);
 }
 #endif

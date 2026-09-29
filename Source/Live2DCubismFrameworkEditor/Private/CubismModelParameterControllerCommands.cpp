@@ -6,8 +6,6 @@
  */
 
 
-#pragma once
-
 #include "CubismModelParameterControllerCommands.h"
 
 #define LOCTEXT_NAMESPACE "CubismModelParameterController"

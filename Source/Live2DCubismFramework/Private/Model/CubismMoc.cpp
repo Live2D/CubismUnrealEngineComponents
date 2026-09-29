@@ -8,8 +8,10 @@
 
 #include "Model/CubismMoc3.h"
 
+#include "CubismSourcePathUtils.h"
 #include "Model/CubismModelComponent.h"
 #include "CubismLog.h"
+#include "Misc/Paths.h"
 
 void UCubismMoc3::SetupModel(UCubismModelComponent* InModel)
 {
@@ -108,6 +110,15 @@ void UCubismMoc3::PostLoad()
 	Super::PostLoad();
 
 	Setup();
+
+#if WITH_EDITORONLY_DATA
+	if (CubismRepairStoredSourcePath(AssetImportData, this, CubismStoredSourcePath))
+	{
+		MarkPackageDirty();
+	}
+#endif
+
+	UE_LOG(LogCubism, Warning, TEXT("UCubismMoc3::PostLoad CubismStoredSourcePath=%s"), *CubismStoredSourcePath);
 }
 
 void UCubismMoc3::PostInitProperties()

@@ -33,6 +33,8 @@ void FCubismMotion::Init(const float Time)
 
 	StartTime = Time;
 	EndTime = Duration;
+	FadeInAnchorTime = StartTime;
+	PrevPhaseTime = 0.0f;
 }
 
 float FCubismMotion::UpdateFadeWeight(const TSharedPtr<FCubismMotion>& CubismMotion, float UserTimeSeconds)

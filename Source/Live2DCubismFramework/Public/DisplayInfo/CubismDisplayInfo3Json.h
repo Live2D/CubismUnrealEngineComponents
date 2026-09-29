@@ -114,7 +114,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Display Info Data")
 	TArray<FCubismDisplayInfoPart> Parts;
 
+	/**
+	 * The stored path to the source file used for Cubism reimport.
+	 */
+	UPROPERTY(VisibleAnywhere, Category = ImportSettings, meta = (DisplayName = "Cubism Stored Source Path"))
+	FString CubismStoredSourcePath;
+
 	virtual void PostInitProperties() override;
+	virtual void PostLoad() override;
 
 #if WITH_EDITORONLY_DATA
 	// Import data for this 

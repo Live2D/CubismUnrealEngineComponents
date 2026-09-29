@@ -65,6 +65,8 @@ void UCubismModelComponent::Setup()
 	}
 
 	SetVisibility(bRenderInWorldSpace, true);
+
+	SetOverrideFlagForModelParameterRepeat(bOverrideParameterRepeat);
 }
 
 ////
@@ -301,7 +303,16 @@ void UCubismModelComponent::SetParameterValue(const int32 ParameterIndex, const 
 
 	check(0 <= ParameterIndex && ParameterIndex < GetParameterCount());
 
-	csmGetParameterValues(RawModel)[ParameterIndex] = Value;
+	float ValueToSet = Value;
+	if (UCubismParameterComponent* P = GetParameter(ParameterIndex))
+	{
+		ValueToSet = P->IsRepeat()
+			? P->GetParameterRepeatValue(Value)
+			: P->GetParameterClampValue(Value);
+		P->Value = ValueToSet;
+	}
+
+	csmGetParameterValues(RawModel)[ParameterIndex] = ValueToSet;
 }
 
 int32 UCubismModelComponent::GetParameterKeyCount(const int32 ParameterIndex) const
@@ -380,6 +391,16 @@ void UCubismModelComponent::AddPart(const FString PartId)
 	Parts.Add(Part);
 }
 
+void UCubismModelComponent::SetParameterValueRaw(const int32 ParameterIndex, const float Value)
+{
+	if (NonNativeParameterValues.Contains(ParameterIndex))
+	{
+		NonNativeParameterValues[ParameterIndex] = Value;
+		return;
+	}
+	check(0 <= ParameterIndex && ParameterIndex < GetParameterCount());
+	csmGetParameterValues(RawModel)[ParameterIndex] = Value;
+}
 ////
 
 ECubismDrawableBlendMode UCubismModelComponent::GetDrawableBlendMode(const int32 DrawableIndex) const
@@ -682,7 +703,10 @@ void UCubismModelComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 	ParameterIndices.Empty();
 	PartIndices.Empty();
 
-	Moc->DeleteModel(this);
+	if (Moc)
+	{
+		Moc->DeleteModel(this);
+	}
 
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }

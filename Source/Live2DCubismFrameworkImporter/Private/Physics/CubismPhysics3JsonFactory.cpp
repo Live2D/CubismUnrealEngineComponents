@@ -8,11 +8,18 @@
 
 #include "CubismPhysics3JsonFactory.h"
 
+#include "CubismImporterUtils.h"
+#include "CubismSourcePathUtils.h"
+
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Physics/CubismPhysics3Json.h"
 #include "Physics/CubismPhysics3JsonImporter.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
+#include "Misc/Paths.h"
+#include "Modules/ModuleManager.h"
 #include "CubismLog.h"
+#include "UObject/SavePackage.h"
 
 UCubismPhysics3JsonFactory::UCubismPhysics3JsonFactory() 
 {
@@ -48,6 +55,11 @@ UObject* UCubismPhysics3JsonFactory::FactoryCreateText
 	FFeedbackContext* Warn
 )
 {
+	if (CubismImporterShouldSuppressDuplicateImport(CurrentFilename, InParent, TEXT("Physics3")))
+	{
+		return nullptr;
+	}
+
 	TObjectPtr<UCubismPhysics3Json> Result = nullptr;
 
 	FCubismPhysics3JsonImporter Importer;
@@ -59,16 +71,26 @@ UObject* UCubismPhysics3JsonFactory::FactoryCreateText
 		
 		Importer.ApplyParams(Flags, Result);
 
+		FString ImportFilename = CurrentFilename;
+		if (!CubismImporterCopySourceToAssetPackageDirectory(CurrentFilename, Result, ImportFilename))
+		{
+			return nullptr;
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(ImportFilename, Result);
+
 		// Update asset import data
 		if (Result->AssetImportData)
 		{
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
 		else
 		{
 			Result->AssetImportData = NewObject<UAssetImportData>(Result, TEXT("AssetImportData"));
-			Result->AssetImportData->Update(CurrentFilename);
+			Result->AssetImportData->Update(ImportFilename);
 		}
+
+		Result->CubismStoredSourcePath = StoredImportPath;
 	}
 
 	return Result;
@@ -90,7 +112,15 @@ void UCubismPhysics3JsonFactory::SetReimportPaths(UObject* Obj, const TArray<FSt
 	UCubismPhysics3Json* Physics = Cast<UCubismPhysics3Json>(Obj);
 	if (Physics && ensure(NewReimportPaths.Num() == 1))
 	{
+		if (!Physics->AssetImportData)
+		{
+			Physics->AssetImportData = NewObject<UAssetImportData>(Physics, TEXT("AssetImportData"));
+		}
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(NewReimportPaths[0], Physics);
+
 		Physics->AssetImportData->UpdateFilenameOnly(NewReimportPaths[0]);
+		Physics->CubismStoredSourcePath = StoredImportPath;
 	}
 }
 
@@ -102,7 +132,24 @@ EReimportResult::Type UCubismPhysics3JsonFactory::Reimport(UObject* Obj)
 		return EReimportResult::Failed;
 	}
 
-	const FString Filename = Physics->AssetImportData->GetFirstFilename();
+	const FString StoredFilename = Physics->AssetImportData
+		? Physics->AssetImportData->GetFirstFilename()
+		: Physics->CubismStoredSourcePath;
+
+	FString Filename = CubismResolveStoredSourcePath(StoredFilename, Physics);
+
+	if (IFileManager::Get().FileSize(*Filename) == INDEX_NONE && CubismIsPluginAsset(Physics))
+	{
+		const FString FallbackFilename = CubismImporterFindPluginLocalSourceFallback(Physics, TEXT(".physics3.json"), true);
+
+		UE_LOG(LogCubism, Warning, TEXT("Physics3 Reimport: Plugin fallback candidate=%s"), *FallbackFilename);
+
+		if (!FallbackFilename.IsEmpty())
+		{
+			Filename = FallbackFilename;
+		}
+	}
+
 	if (!Filename.Len())
 	{
 		return EReimportResult::Failed;
@@ -116,13 +163,39 @@ EReimportResult::Type UCubismPhysics3JsonFactory::Reimport(UObject* Obj)
 
 	bool OutCanceled = false;
 
-	if (ImportObject(Physics->GetClass(), Physics->GetOuter(), *Physics->GetName(), RF_Public, Filename, nullptr, OutCanceled))
+	UObject* ImportedObject = ImportObject(Physics->GetClass(), Physics->GetOuter(), *Physics->GetName(), RF_Public | RF_Standalone, Filename, nullptr, OutCanceled);
+
+	if (ImportedObject)
 	{
 		UE_LOG(LogCubism, Log, TEXT("Reimported successfully"));
 
-		Physics->AssetImportData->Update(Filename);
+		UCubismPhysics3Json* ReimportedPhysics = Cast<UCubismPhysics3Json>(ImportedObject);
+		if (!ReimportedPhysics)
+		{
+			UE_LOG(LogCubism, Error, TEXT("Reimport failed: ImportedObject is not UCubismPhysics3Json"));
+			return EReimportResult::Failed;
+		}
 
-		Physics->MarkPackageDirty();
+		if (!ReimportedPhysics->AssetImportData)
+		{
+			ReimportedPhysics->AssetImportData = NewObject<UAssetImportData>(ReimportedPhysics, TEXT("AssetImportData"));
+		}
+
+		ReimportedPhysics->Modify();
+
+		const FString StoredImportPath = CubismMakeStoredSourcePath(Filename, ReimportedPhysics);
+
+		ReimportedPhysics->AssetImportData->Update(Filename);
+		ReimportedPhysics->CubismStoredSourcePath = StoredImportPath;
+		ReimportedPhysics->MarkPackageDirty();
+		CubismImporterUpdateAssetRegistryTags(ReimportedPhysics);
+
+#if WITH_EDITOR
+		ReimportedPhysics->PostEditChange();
+#endif
+
+		CubismImporterSaveReimportedAssetPackage(ReimportedPhysics, TEXT("Physics3"));
+		CubismImporterUpdateAssetRegistryTags(ReimportedPhysics);
 
 		return EReimportResult::Succeeded;
 	}

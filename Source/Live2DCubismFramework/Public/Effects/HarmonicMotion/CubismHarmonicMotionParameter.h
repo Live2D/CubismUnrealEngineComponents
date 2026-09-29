@@ -86,5 +86,8 @@ public:
 	FString Id = TEXT("");
 
 public:
+	UPROPERTY(Transient)
+	float InternalTime = 0.0f;
+
 	float CalcValue(const float Time, const float Min, const float Max);
 };

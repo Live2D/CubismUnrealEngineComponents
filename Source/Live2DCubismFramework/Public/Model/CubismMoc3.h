@@ -30,6 +30,12 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Moc Data")
 	int32 Version;
 
+	/**
+	 * The stored path to the source file used for Cubism reimport.
+	 */
+	UPROPERTY(VisibleAnywhere, Category = ImportSettings, meta = (DisplayName = "Cubism Stored Source Path"))
+	FString CubismStoredSourcePath;
+
 public:
 	/**
 	 * @brief The function to load the moc data into memory and assign it to the model.

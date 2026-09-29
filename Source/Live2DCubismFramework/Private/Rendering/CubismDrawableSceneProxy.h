@@ -20,22 +20,23 @@
 #include "VertexFactory.h"
 #include "CubismRenderingResource.h"
 
+#include <array>
+
 /**
  * A representation of a UCubismDrawableComponent on the rendering thread.
  */
 class FCubismDrawableSceneProxy : public FPrimitiveSceneProxy
 {
 public:
+	static constexpr uint32 kNumMultipleBufferingResources = 3;
+
 	FCubismDrawableSceneProxy(const TObjectPtr<UCubismDrawableComponent>& Drawable, FCubismDrawableDynamicMeshData InDynamicData)
 		: FPrimitiveSceneProxy(Drawable)
 		, DynamicData(InDynamicData)
 		, MaterialInstance(Drawable->GetMaterial(0))
 		, MaterialRelevance(Drawable->GetMaterialRelevance(GetScene().GetFeatureLevel()))
-		, VertexBuffer(nullptr)
-		, IndexBuffer(nullptr)
-		, VertexFactory(nullptr)
 	{
-		ENQUEUE_RENDER_COMMAND(InitCubismDrawableSceneProxy)(
+		ENQUEUE_RENDER_COMMAND(FCubismDrawableSceneProxy_Ctor)(
 			[this](FRHICommandListImmediate& RHICmdList)
 			{
 				UpdateDynamicData(RHICmdList, DynamicData);
@@ -43,29 +44,38 @@ public:
 		);
 	}
 
-	virtual ~FCubismDrawableSceneProxy() 
-	{ 
-		if (VertexFactory)
+	virtual ~FCubismDrawableSceneProxy() override
+	{
+		if (IsInitializedDrawableResources)
 		{
-			VertexFactory->ReleaseResource();
-			delete VertexFactory;
-		}
-		if (VertexBuffer)
-		{
-			VertexBuffer->ReleaseResource();
-			delete VertexBuffer;
-		}
-		if (IndexBuffer)
-		{
-			IndexBuffer->ReleaseResource();
-			delete IndexBuffer;
+			ClearDrawableResources();
+
+			IsInitializedDrawableResources = false;
 		}
 	}
 
-	SIZE_T GetTypeHash() const override
+	virtual SIZE_T GetTypeHash() const override
 	{
 		static size_t UniquePointer;
 		return reinterpret_cast<size_t>(&UniquePointer);
+	}
+
+	FMaterialRenderProxy* GetMaterialRenderProxy(FMeshElementCollector& Collector, const bool bWireframe) const
+	{
+		if (bWireframe)
+		{
+			FColoredMaterialRenderProxy* WireframeMaterialInstance = new FColoredMaterialRenderProxy(
+				GEngine->WireframeMaterial->GetRenderProxy(),
+				FLinearColor(0.0f, 0.5f, 1.0f)
+			);
+
+			Collector.RegisterOneFrameMaterialProxy(WireframeMaterialInstance);
+
+			return WireframeMaterialInstance;
+		}
+
+
+		return MaterialInstance->GetRenderProxy();
 	}
 
 	virtual void GetDynamicMeshElements(
@@ -75,144 +85,170 @@ public:
 		FMeshElementCollector& Collector
 	) const override
 	{
-		if (DynamicData.Positions.Num() == 0 || DynamicData.UVs.Num() == 0 || DynamicData.Indices.Num() == 0)
+		if (!DynamicData.ExistsAllElements())
 		{
 			return;
 		}
 
+
+		FCubismDrawableResource* CurrentResource = GetCurrentResource();
+
+
 		const bool bWireframe = AllowDebugViewmodes() && ViewFamily.EngineShowFlags.Wireframe;
+		FMaterialRenderProxy* MaterialRenderProxy = GetMaterialRenderProxy(Collector, bWireframe);
 
-		FMaterialRenderProxy* MaterialRenderProxy = nullptr;
-		if (bWireframe)
-		{
-			FColoredMaterialRenderProxy* WireframeMaterialInstance = new FColoredMaterialRenderProxy(
-				GEngine->WireframeMaterial->GetRenderProxy(),
-				FLinearColor(0.0f, 0.5f, 1.0f)
-			);
-
-			Collector.RegisterOneFrameMaterialProxy(WireframeMaterialInstance);
-			MaterialRenderProxy = WireframeMaterialInstance;
-		}
-		else
-		{
-			MaterialRenderProxy = MaterialInstance->GetRenderProxy();
-		}
 
 		for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
 		{
-			if (VisibilityMap & (1 << ViewIndex))
+			if (!(VisibilityMap & 1 << ViewIndex))
 			{
-				const FSceneView* View = Views[ViewIndex];
+				continue;
+			}
 
-				FMeshBatch& Mesh = Collector.AllocateMesh();
+
+			const FSceneView* View = Views[ViewIndex];
+
+
+			FMeshBatch& Mesh = Collector.AllocateMesh();
+			{
 				Mesh.ReverseCulling = IsLocalToWorldDeterminantNegative();
 				Mesh.bDisableBackfaceCulling = DynamicData.bTwoSided;
 				Mesh.Type = PT_TriangleList;
-
-				Mesh.VertexFactory = VertexFactory;
+				Mesh.VertexFactory = CurrentResource->GetLocalVertexFactoryPointer();
 				Mesh.MaterialRenderProxy = MaterialRenderProxy;
-
-				FMeshBatchElement& BatchElement = Mesh.Elements[0];
-
-				FDynamicPrimitiveUniformBuffer& DynamicPrimitiveUniformBuffer = Collector.AllocateOneFrameResource<FDynamicPrimitiveUniformBuffer>();
-				#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 4
-				DynamicPrimitiveUniformBuffer.Set(Collector.GetRHICommandList(), GetLocalToWorld(), GetLocalToWorld(), GetBounds(), GetLocalBounds(), false, false, AlwaysHasVelocity());
-				#else
-				DynamicPrimitiveUniformBuffer.Set(GetLocalToWorld(), GetLocalToWorld(), GetBounds(), GetLocalBounds(), false, false, AlwaysHasVelocity());
-				#endif
-				BatchElement.PrimitiveUniformBufferResource = &DynamicPrimitiveUniformBuffer.UniformBuffer;
-
-				BatchElement.IndexBuffer = IndexBuffer;
-
-				BatchElement.FirstIndex = 0;
-				BatchElement.NumPrimitives = IndexBuffer->Indices.Num() / 3;
-				BatchElement.MinVertexIndex = 0;
-				BatchElement.MaxVertexIndex = VertexBuffer->Positions.Num() - 1;
-
-				Collector.AddMesh(ViewIndex, Mesh);
 			}
+
+
+			FMeshBatchElement& BatchElement = Mesh.Elements[0];
+			{
+				FDynamicPrimitiveUniformBuffer& DynamicPrimitiveUniformBuffer = Collector.AllocateOneFrameResource<FDynamicPrimitiveUniformBuffer>();
+
+
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 4
+				DynamicPrimitiveUniformBuffer.Set(Collector.GetRHICommandList(), GetLocalToWorld(), GetLocalToWorld(), GetBounds(), GetLocalBounds(), false, false, AlwaysHasVelocity());
+
+#else
+				DynamicPrimitiveUniformBuffer.Set(GetLocalToWorld(), GetLocalToWorld(), GetBounds(), GetLocalBounds(), false, false, AlwaysHasVelocity());
+
+#endif
+
+
+				BatchElement.PrimitiveUniformBufferResource = &DynamicPrimitiveUniformBuffer.UniformBuffer;
+				BatchElement.IndexBuffer = &CurrentResource->GetIndexBuffer();
+				BatchElement.FirstIndex = 0;
+				BatchElement.NumPrimitives = CurrentResource->NumIndices() / 3;
+				BatchElement.MinVertexIndex = 0;
+				BatchElement.MaxVertexIndex = CurrentResource->NumVertices() - 1;
+			}
+
+			Collector.AddMesh(ViewIndex, Mesh);
 		}
 	}
 
 	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) const override
 	{
 		FPrimitiveViewRelevance Result;
+
+
 		Result.bDrawRelevance = IsShown(View);
 		Result.bShadowRelevance = IsShadowCast(View);
 		Result.bDynamicRelevance = true;
 		Result.bRenderInMainPass = ShouldRenderInMainPass();
 		Result.bUsesLightingChannels = GetLightingChannelMask() != GetDefaultLightingChannelMask();
 		Result.bRenderCustomDepth = ShouldRenderCustomDepth();
+
+
 		MaterialRelevance.SetPrimitiveViewRelevance(Result);
+
 		return Result;
 	}
 
-	virtual bool CanBeOccluded() const override { return !MaterialRelevance.bDisableDepthTest; }
+	virtual bool CanBeOccluded() const override
+	{
+		return !MaterialRelevance.bDisableDepthTest;
+	}
 
-	virtual uint32 GetMemoryFootprint(void) const override { return(sizeof(*this) + GetAllocatedSize()); }
+	virtual uint32 GetMemoryFootprint() const override
+	{
+		return(sizeof(*this) + GetAllocatedSize());
+	}
 
 	void UpdateDynamicData(FRHICommandListImmediate& RHICmdList, const FCubismDrawableDynamicMeshData& NewDynamicData)
 	{
 		DynamicData = NewDynamicData;
 
-		if (DynamicData.Positions.Num() > 0 && DynamicData.UVs.Num() > 0)
+
+		if (!DynamicData.ExistsAllElements())
 		{
-			if (VertexBuffer)
-			{
-				VertexBuffer->UpdateBuffer(DynamicData.Positions, DynamicData.UVs);
-			}
-			else
-			{
-				VertexBuffer = new FCubismDrawableVertexBuffer(DynamicData);
-				#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-				VertexBuffer->InitResource(RHICmdList);
-				#else
-				VertexBuffer->InitResource();
-				#endif
-			}
+			return;
 		}
 
-		if (DynamicData.Indices.Num() > 0)
+
+		if (!IsInitializedDrawableResources)
 		{
-			if (IndexBuffer)
-			{
-				IndexBuffer->UpdateBuffer(DynamicData.Indices);
-			}
-			else
-			{
-				IndexBuffer = new FCubismDrawableIndexBuffer(DynamicData);
-				#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-				IndexBuffer->InitResource(RHICmdList);
-				#else
-				IndexBuffer->InitResource();
-				#endif
-			}
+			ERHIFeatureLevel::Type FeatureLevel = GetScene().GetFeatureLevel();
+			MakeDrawableResources(RHICmdList, FeatureLevel);
+
+
+			IsInitializedDrawableResources = true;
+
+			return;
 		}
 
-		if (!VertexFactory && VertexBuffer)
+
+		GetCurrentResource()->UpdateBuffer(DynamicData);
+	}
+
+private:
+	static int32 GetCurrentBufferIndex()
+	{
+		return GFrameNumberRenderThread % kNumMultipleBufferingResources;
+	}
+
+	FCubismDrawableResource* GetCurrentResource() const
+	{
+		const int32 BufferIndex = GetCurrentBufferIndex();
+		return DrawableResources[BufferIndex];
+	}
+
+	void MakeDrawableResources(FRHICommandListImmediate& RHICmdList, ERHIFeatureLevel::Type FeatureLevel)
+	{
+		for (auto& Resource : DrawableResources)
 		{
-			VertexFactory = new FCubismDrawableVertexFactory(GetScene().GetFeatureLevel(), VertexBuffer);
-			#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-			VertexFactory->InitResource(RHICmdList);
-			#else
-			VertexFactory->InitResource();
-			#endif
+			Resource = new FCubismDrawableResource(DynamicData, FeatureLevel);
+
+			Resource->InitResource(RHICmdList);
 		}
 	}
 
-public:
-	/** Dynamic mesh data for the drawable. */
-	FCubismDrawableDynamicMeshData DynamicData;
+	void ClearDrawableResources()
+	{
+		for (auto& Resource : DrawableResources)
+		{
+			if (!Resource)
+			{
+				continue;
+			}
 
-private:
+
+			Resource->ReleaseResource();
+
+			delete Resource;
+			Resource = nullptr;
+		}
+	}
+
+	/** Dynamic mesh data for the drawable. */
+	FCubismDrawableDynamicMeshData DynamicData = {};
+
+
 	/** The material instance to use for rendering. */
-	UMaterialInterface* MaterialInstance;
+	UMaterialInterface* MaterialInstance = nullptr;
 
 	/** The material relevance for the drawable. */
-	FMaterialRelevance MaterialRelevance;
+	FMaterialRelevance MaterialRelevance = {};
 
 	/** Dynamic rendering resources */
-	mutable FCubismDrawableVertexBuffer* VertexBuffer;
-	mutable FCubismDrawableIndexBuffer* IndexBuffer;
-	mutable FCubismDrawableVertexFactory* VertexFactory;
+	std::array<FCubismDrawableResource*, kNumMultipleBufferingResources> DrawableResources = {};
+	bool IsInitializedDrawableResources = false;
 };
